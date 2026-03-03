@@ -81,18 +81,19 @@ app.post('/api/get-trial', (req, res) => {
   // এই PC আগে trial নিয়েছে?
   if (trials.used_pcs[hashedPc]) {
     const prevTrial = trials.used_pcs[hashedPc];
+    const cfg = loadConfig();
     // Trial এখনও active আছে?
     if (new Date(prevTrial.expiry).getTime() > Date.now()) {
-      // Return existing trial (reinstall case)
+      // Trial still running — return existing (even after reinstall)
       return res.json({
         success: true,
         key: prevTrial.key,
         expiry: prevTrial.expiry,
+        duration_ms: cfg.trial_duration_ms || (2 * 60 * 60 * 1000),
         message: 'Trial reactivated.'
       });
     } else {
       // Trial শেষ হয়ে গেছে — retry allowed?
-      const cfg = loadConfig();
       if (cfg.allow_retry_trial) {
         // Admin allowed retry — give fresh trial
         const trialDurationMs = cfg.trial_duration_ms || (2 * 60 * 60 * 1000);
