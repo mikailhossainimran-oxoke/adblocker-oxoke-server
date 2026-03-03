@@ -197,7 +197,7 @@ app.post('/api/admin/set-retry-trial', (req, res) => {
   cfg.allow_retry_trial = !!allow_retry_trial;
   saveConfig(cfg);
   return res.json({ success: true, allow_retry_trial: cfg.allow_retry_trial });
-});PC-locked
+});
 // ==============================
 app.post('/api/activate', (req, res) => {
   const { code, pc_fingerprint } = req.body;
