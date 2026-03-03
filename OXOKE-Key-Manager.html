@@ -1,0 +1,929 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>OXOKE Key Manager</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0b0d18;--surface:#13152a;--surface2:#1a1d35;--border:#252842;
+  --accent:#00e5ff;--accent2:#7c3aed;--text:#e8eaf6;--muted:#6b74b2;
+  --green:#00e676;--red:#ff3d71;--yellow:#ffd740;--orange:#ff9100;
+}
+body{min-height:100vh;background:var(--bg);color:var(--text);
+  font-family:'Segoe UI',system-ui,sans-serif;font-size:13px;}
+
+/* HEADER */
+.header{background:linear-gradient(135deg,var(--accent2),var(--accent));
+  padding:20px 32px;display:flex;align-items:center;justify-content:space-between;}
+.header-title{font-size:22px;font-weight:800;letter-spacing:3px;color:#fff;}
+.header-sub{font-size:11px;color:rgba(255,255,255,0.75);letter-spacing:2px;margin-top:3px;}
+.header-badge{background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.25);
+  color:#fff;padding:5px 14px;border-radius:100px;font-size:11px;font-weight:700;letter-spacing:1px;}
+
+/* LAYOUT */
+.container{max-width:1100px;margin:0 auto;padding:28px 24px;display:flex;flex-direction:column;gap:22px;}
+
+/* CARDS */
+.card{background:var(--surface);border:1.5px solid var(--border);border-radius:14px;padding:22px 24px;}
+.card-title{font-size:13px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;
+  color:var(--muted);margin-bottom:18px;display:flex;align-items:center;gap:8px;}
+.card-title svg{width:16px;height:16px;color:var(--accent);}
+
+/* STATS */
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;}
+.stat{background:var(--surface2);border:1.5px solid var(--border);border-radius:12px;
+  padding:16px;text-align:center;}
+.stat-num{font-size:28px;font-weight:800;background:linear-gradient(135deg,var(--accent2),var(--accent));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;line-height:1.1;}
+.stat-lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-top:4px;}
+
+/* INPUTS */
+.input-row{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;}
+.field{display:flex;flex-direction:column;gap:5px;}
+.field label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;}
+.field input,.field select{padding:10px 13px;background:var(--surface2);border:1.5px solid var(--border);
+  border-radius:9px;color:var(--text);font-size:13px;outline:none;transition:border-color 0.2s;min-width:0;}
+.field input:focus,.field select:focus{border-color:var(--accent);}
+.field select option{background:var(--surface2);}
+
+/* EXPIRY PRESETS */
+.expiry-presets{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px;}
+.preset-btn{padding:6px 14px;border:1.5px solid var(--border);border-radius:100px;
+  background:var(--surface2);color:var(--muted);font-size:11px;font-weight:600;cursor:pointer;
+  transition:all 0.2s;white-space:nowrap;}
+.preset-btn:hover,.preset-btn.active{border-color:var(--accent);color:var(--accent);background:rgba(0,229,255,0.07);}
+.preset-btn.trial{border-color:rgba(255,215,64,0.4);color:var(--yellow);}
+.preset-btn.trial:hover,.preset-btn.trial.active{background:rgba(255,215,64,0.07);}
+
+/* BUTTONS */
+.btn{padding:10px 20px;border:none;border-radius:9px;cursor:pointer;
+  font-size:13px;font-weight:700;letter-spacing:1px;transition:all 0.2s;
+  display:inline-flex;align-items:center;gap:7px;white-space:nowrap;}
+.btn-primary{background:linear-gradient(135deg,var(--accent2),var(--accent));color:#fff;}
+.btn-primary:hover{opacity:0.88;transform:translateY(-1px);}
+.btn-green{background:linear-gradient(135deg,#00b248,#00e676);color:#fff;}
+.btn-green:hover{opacity:0.88;}
+.btn-outline{background:transparent;border:1.5px solid var(--border);color:var(--muted);}
+.btn-outline:hover{border-color:var(--accent);color:var(--accent);}
+.btn-red{background:transparent;border:1.5px solid rgba(255,61,113,0.4);color:var(--red);}
+.btn-red:hover{background:rgba(255,61,113,0.08);}
+.btn:disabled{opacity:0.4;cursor:not-allowed;transform:none!important;}
+.btn-sm{padding:6px 12px;font-size:11px;}
+
+/* SERVER CONNECTION */
+.server-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+.server-url{flex:2;padding:10px 14px;background:var(--surface2);border:1.5px solid var(--border);
+  border-radius:9px;color:var(--text);font-size:13px;outline:none;font-family:monospace;}
+.server-url:focus{border-color:var(--accent);}
+.admin-key{flex:1;padding:10px 14px;background:var(--surface2);border:1.5px solid var(--border);
+  border-radius:9px;color:var(--text);font-size:13px;outline:none;}
+.admin-key:focus{border-color:var(--accent);}
+.server-status{display:flex;align-items:center;gap:6px;font-size:12px;padding:8px 14px;
+  border-radius:9px;border:1.5px solid var(--border);background:var(--surface2);white-space:nowrap;}
+.dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.dot.green{background:var(--green);box-shadow:0 0 6px var(--green);}
+.dot.red{background:var(--red);}
+.dot.yellow{background:var(--yellow);animation:blink 1s infinite;}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0.3}}
+
+/* GENERATED KEYS TABLE */
+.keys-list{display:flex;flex-direction:column;gap:8px;max-height:280px;overflow-y:auto;
+  padding-right:4px;}
+.key-item{background:var(--surface2);border:1.5px solid var(--border);border-radius:10px;
+  padding:11px 15px;display:flex;align-items:center;gap:10px;transition:border-color 0.2s;}
+.key-item:hover{border-color:var(--border);}
+.key-code{font-family:'Courier New',monospace;font-size:13px;font-weight:700;
+  color:var(--accent);letter-spacing:1.5px;flex:1;}
+.key-meta{font-size:10px;color:var(--muted);text-align:right;line-height:1.6;flex-shrink:0;}
+.key-expiry-badge{padding:2px 10px;border-radius:100px;font-size:10px;font-weight:700;letter-spacing:1px;}
+.badge-trial{background:rgba(255,215,64,0.1);color:var(--yellow);border:1px solid rgba(255,215,64,0.3);}
+.badge-monthly{background:rgba(0,230,118,0.1);color:var(--green);border:1px solid rgba(0,230,118,0.3);}
+.badge-custom{background:rgba(0,229,255,0.1);color:var(--accent);border:1px solid rgba(0,229,255,0.3);}
+.key-status{font-size:10px;padding:2px 8px;border-radius:100px;font-weight:600;}
+.status-added{background:rgba(0,230,118,0.1);color:var(--green);}
+.status-pending{background:rgba(107,116,178,0.15);color:var(--muted);}
+
+/* ALL KEYS TABLE */
+.table{width:100%;border-collapse:collapse;}
+.table th{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;
+  padding:8px 12px;text-align:left;border-bottom:1.5px solid var(--border);}
+.table td{padding:10px 12px;border-bottom:1px solid rgba(37,40,66,0.5);font-size:12px;vertical-align:middle;}
+.table tr:hover td{background:rgba(255,255,255,0.02);}
+.table .code-cell{font-family:'Courier New',monospace;color:var(--accent);font-weight:700;letter-spacing:1px;}
+.table .status-cell span{padding:2px 10px;border-radius:100px;font-size:10px;font-weight:700;}
+.active-badge{background:rgba(0,230,118,0.1);color:var(--green);border:1px solid rgba(0,230,118,0.3);}
+.disabled-badge{background:rgba(255,61,113,0.1);color:var(--red);border:1px solid rgba(255,61,113,0.3);}
+.expired-badge{background:rgba(255,145,0,0.1);color:var(--orange);border:1px solid rgba(255,145,0,0.3);}
+.free-badge{background:rgba(0,229,255,0.1);color:var(--accent);border:1px solid rgba(0,229,255,0.3);}
+.locked-badge{background:rgba(124,58,237,0.1);color:#a78bfa;border:1px solid rgba(124,58,237,0.3);}
+
+/* LOG */
+.log{background:var(--bg);border:1.5px solid var(--border);border-radius:10px;
+  padding:14px;height:160px;overflow-y:auto;font-family:'Courier New',monospace;font-size:11px;line-height:1.8;}
+.log-line{padding:1px 0;}
+.log-ok{color:var(--green);}
+.log-err{color:var(--red);}
+.log-info{color:var(--accent);}
+.log-warn{color:var(--yellow);}
+
+/* COPY TOAST */
+.toast{position:fixed;bottom:24px;right:24px;background:var(--green);color:#000;
+  padding:10px 20px;border-radius:10px;font-weight:700;font-size:12px;
+  transform:translateY(60px);opacity:0;transition:all 0.3s;z-index:999;}
+.toast.show{transform:translateY(0);opacity:1;}
+
+/* Scrollbar */
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+
+.divider{height:1.5px;background:var(--border);margin:6px 0;}
+.section-row{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <div class="header-title">OXOKE ADS BLOCKER</div>
+    <div class="header-sub">LICENSE KEY MANAGER · ADMIN PANEL</div>
+  </div>
+  <div class="header-badge">KEY MANAGER v2.0</div>
+</div>
+
+<div class="container">
+
+  <!-- SERVER CONNECTION -->
+  <div class="card">
+    <div class="card-title">
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>
+      </svg>
+      Server Connection
+    </div>
+    <div class="server-row">
+      <input class="server-url" id="serverUrl" value="https://oxoke-server.onrender.com" placeholder="https://your-server.onrender.com"/>
+      <input class="admin-key" id="adminKey" value="oxoke_admin_2025" placeholder="Admin Key" type="password"/>
+      <div class="server-status" id="serverStatus">
+        <div class="dot yellow"></div>
+        <span id="serverStatusText">Not tested</span>
+      </div>
+      <button class="btn btn-primary" onclick="testServer()">
+        <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        TEST
+      </button>
+    </div>
+  </div>
+
+  <!-- STATS -->
+  <div class="stats-grid">
+    <div class="stat">
+      <div class="stat-num" id="statTotal">—</div>
+      <div class="stat-lbl">Total Keys</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num" id="statActive">—</div>
+      <div class="stat-lbl">Active</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num" id="statInUse">—</div>
+      <div class="stat-lbl">In Use</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num" id="statFree">—</div>
+      <div class="stat-lbl">Available</div>
+    </div>
+  </div>
+
+  <!-- GENERATE KEYS -->
+  <div class="card">
+    <div class="card-title">
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3"/>
+      </svg>
+      Generate New Keys
+    </div>
+
+    <!-- Custom expiry row -->
+    <div class="input-row" style="margin-bottom:14px;align-items:flex-end;flex-wrap:wrap;gap:12px;">
+      <div class="field" style="flex:0 0 110px;">
+        <label>কতটা Key?</label>
+        <input type="number" id="keyCount" value="1" min="1" max="100" style="width:100%;"/>
+      </div>
+
+      <!-- Duration inputs -->
+      <div style="display:flex;gap:0;border:1.5px solid var(--border);border-radius:10px;overflow:hidden;background:var(--surface2);">
+        <div style="display:flex;flex-direction:column;padding:8px 12px;border-right:1.5px solid var(--border);min-width:90px;">
+          <label style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:5px;">📅 Days (দিন)</label>
+          <input type="number" id="dDays" value="0" min="0" max="9999"
+            style="background:transparent;border:none;outline:none;color:var(--text);font-size:18px;font-weight:700;width:100%;padding:0;"
+            oninput="updateExpiryPreview()"/>
+        </div>
+        <div style="display:flex;flex-direction:column;padding:8px 12px;border-right:1.5px solid var(--border);min-width:90px;">
+          <label style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:5px;">⏱ Hours (ঘন্টা)</label>
+          <input type="number" id="dHours" value="0" min="0" max="9999"
+            style="background:transparent;border:none;outline:none;color:var(--text);font-size:18px;font-weight:700;width:100%;padding:0;"
+            oninput="updateExpiryPreview()"/>
+        </div>
+        <div style="display:flex;flex-direction:column;padding:8px 12px;min-width:90px;">
+          <label style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:5px;">⚡ Minutes (মিনিট)</label>
+          <input type="number" id="dMinutes" value="0" min="0" max="9999"
+            style="background:transparent;border:none;outline:none;color:var(--text);font-size:18px;font-weight:700;width:100%;padding:0;"
+            oninput="updateExpiryPreview()"/>
+        </div>
+      </div>
+
+      <div class="field" style="flex:0 0 115px;">
+        <label>Type Label</label>
+        <select id="keyTypeLabel" style="width:100%;">
+          <option value="trial">Trial</option>
+          <option value="monthly" selected>Monthly</option>
+          <option value="custom">Custom</option>
+        </select>
+      </div>
+
+      <div class="field" style="flex:1;min-width:180px;">
+        <label>মেয়াদ শেষ হবে</label>
+        <input type="text" id="expiryPreview" readonly style="color:var(--accent);background:var(--bg);cursor:default;"/>
+        <div id="durationSummary" style="font-size:10px;color:var(--muted);margin-top:4px;"></div>
+      </div>
+
+      <div class="field">
+        <label>&nbsp;</label>
+        <button class="btn btn-primary" onclick="generateKeys()" id="generateBtn">
+          <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path d="M12 5v14M5 12h14"/>
+          </svg>
+          GENERATE
+        </button>
+      </div>
+    </div>
+
+    <!-- Generated keys list -->
+    <div id="generatedList" class="keys-list" style="display:none;"></div>
+
+    <div id="generateActions" style="display:none;margin-top:14px;display:none;">
+      <div class="divider" style="margin-bottom:14px;"></div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <button class="btn btn-green" onclick="addAllToServer()" id="addServerBtn">
+          <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          ADD ALL TO SERVER
+        </button>
+        <button class="btn btn-outline" onclick="copyAll()">
+          <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          COPY ALL
+        </button>
+        <button class="btn btn-outline" onclick="downloadTxt()">
+          <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          DOWNLOAD .TXT
+        </button>
+        <button class="btn btn-red btn-sm" onclick="clearGenerated()">CLEAR</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ALL KEYS FROM SERVER -->
+  <div class="card">
+    <div class="section-row" style="margin-bottom:16px;">
+      <div class="card-title" style="margin-bottom:0;">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+        </svg>
+        All Keys on Server
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-outline btn-sm" onclick="loadAllKeys()">🔄 REFRESH</button>
+      </div>
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="table" id="keysTable">
+        <thead>
+          <tr>
+            <th>Key Code</th>
+            <th>Type</th>
+            <th>Status</th>
+            <th>PC Lock</th>
+            <th>Expiry</th>
+            <th>Created</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="keysTableBody">
+          <tr><td colspan="7" style="text-align:center;color:var(--muted);padding:20px;">Click REFRESH to load keys</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- TRIAL SETTINGS -->
+  <div class="card">
+    <div class="card-title">
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+      </svg>
+      Free Trial Settings
+    </div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:14px;line-height:1.6;">
+      এখানে Free Trial এর মেয়াদ পরিবর্তন করুন। পরিবর্তনের পর নতুন trial request-এ নতুন মেয়াদ প্রযোজ্য হবে।
+    </div>
+
+    <div class="input-row" style="align-items:flex-end;flex-wrap:wrap;gap:12px;margin-bottom:14px;">
+      <div style="display:flex;gap:0;border:1.5px solid var(--border);border-radius:10px;overflow:hidden;background:var(--surface2);">
+        <div style="display:flex;flex-direction:column;padding:8px 12px;border-right:1.5px solid var(--border);min-width:90px;">
+          <label style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:5px;">📅 Days (দিন)</label>
+          <input type="number" id="trialDays" value="0" min="0" max="365" style="background:transparent;border:none;outline:none;color:var(--text);font-size:18px;font-weight:700;width:100%;padding:0;"/>
+        </div>
+        <div style="display:flex;flex-direction:column;padding:8px 12px;border-right:1.5px solid var(--border);min-width:90px;">
+          <label style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:5px;">⏱ Hours (ঘন্টা)</label>
+          <input type="number" id="trialHours" value="2" min="0" max="23" style="background:transparent;border:none;outline:none;color:var(--text);font-size:18px;font-weight:700;width:100%;padding:0;"/>
+        </div>
+        <div style="display:flex;flex-direction:column;padding:8px 12px;min-width:90px;">
+          <label style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:5px;">⚡ Minutes (মিনিট)</label>
+          <input type="number" id="trialMinutes" value="0" min="0" max="59" style="background:transparent;border:none;outline:none;color:var(--text);font-size:18px;font-weight:700;width:100%;padding:0;"/>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn" style="background:rgba(255,215,64,0.15);border:1.5px solid rgba(255,215,64,0.5);color:var(--yellow);padding:8px 12px;font-size:11px;" onclick="setTrialPreset(0,0,30)">30 মিনিট</button>
+        <button class="btn" style="background:rgba(255,215,64,0.15);border:1.5px solid rgba(255,215,64,0.5);color:var(--yellow);padding:8px 12px;font-size:11px;" onclick="setTrialPreset(0,1,0)">1 ঘন্টা</button>
+        <button class="btn" style="background:rgba(255,215,64,0.15);border:1.5px solid rgba(255,215,64,0.5);color:var(--yellow);padding:8px 12px;font-size:11px;" onclick="setTrialPreset(0,2,0)">2 ঘন্টা</button>
+        <button class="btn" style="background:rgba(255,215,64,0.15);border:1.5px solid rgba(255,215,64,0.5);color:var(--yellow);padding:8px 12px;font-size:11px;" onclick="setTrialPreset(0,6,0)">6 ঘন্টা</button>
+        <button class="btn" style="background:rgba(255,215,64,0.15);border:1.5px solid rgba(255,215,64,0.5);color:var(--yellow);padding:8px 12px;font-size:11px;" onclick="setTrialPreset(0,24,0)">24 ঘন্টা</button>
+        <button class="btn" style="background:rgba(255,215,64,0.15);border:1.5px solid rgba(255,215,64,0.5);color:var(--yellow);padding:8px 12px;font-size:11px;" onclick="setTrialPreset(7,0,0)">7 দিন</button>
+        <button class="btn" style="background:rgba(255,215,64,0.15);border:1.5px solid rgba(255,215,64,0.5);color:var(--yellow);padding:8px 12px;font-size:11px;" onclick="setTrialPreset(30,0,0)">30 দিন</button>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:10px;align-items:center;">
+      <button class="btn btn-accent" id="saveTrialBtn" onclick="saveTrialDuration()" style="flex:1;">
+        💾 SAVE TRIAL DURATION
+      </button>
+      <button class="btn btn-outline" onclick="loadTrialDuration()">🔄 Current</button>
+    </div>
+    <div id="trialMsg" style="margin-top:10px;font-size:12px;min-height:18px;text-align:center;"></div>
+  </div>
+
+  <!-- RETRY TRIAL -->
+  <div class="card">
+    <div class="card-title">
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>
+      </svg>
+      Free Trial Retry Control
+    </div>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:16px;">এই অপশন <b>ON</b> করলে যাদের free trial শেষ হয়ে গেছে তারা আবার নতুন করে free trial পাবে। <b>OFF</b> করলে আবার বন্ধ হয়ে যাবে।</p>
+
+    <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+      <!-- Toggle Switch -->
+      <div style="display:flex;align-items:center;gap:12px;">
+        <span style="font-size:13px;color:var(--muted);">Retry Trial:</span>
+        <label style="position:relative;display:inline-block;width:52px;height:28px;cursor:pointer;">
+          <input type="checkbox" id="retryTrialToggle" style="opacity:0;width:0;height:0;" onchange="setRetryTrial(this.checked)">
+          <span id="retrySlider" style="position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:#333;border-radius:28px;transition:.3s;border:1.5px solid var(--border);">
+            <span id="retryKnob" style="position:absolute;height:20px;width:20px;left:3px;bottom:3px;background:var(--muted);border-radius:50%;transition:.3s;"></span>
+          </span>
+        </label>
+        <span id="retryStatusLabel" style="font-size:13px;font-weight:700;color:var(--muted);">—</span>
+      </div>
+
+      <button class="btn btn-outline" onclick="loadRetryStatus(true)" style="font-size:11px;padding:6px 14px;">🔄 Refresh</button>
+    </div>
+
+    <div id="retryMsg" style="margin-top:12px;font-size:12px;min-height:18px;text-align:center;"></div>
+  </div>
+
+  <!-- ACTIVITY LOG -->
+  <div class="card">
+    <div class="section-row" style="margin-bottom:14px;">
+      <div class="card-title" style="margin-bottom:0;">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
+        </svg>
+        Activity Log
+      </div>
+      <button class="btn btn-red btn-sm" onclick="clearLog()">CLEAR LOG</button>
+    </div>
+    <div class="log" id="activityLog">
+      <div class="log-info log-line">[ OXOKE Key Manager v2.0 Ready ]</div>
+    </div>
+  </div>
+
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ============================================================
+// STATE
+// ============================================================
+let generatedKeys = [];
+let selectedDays = 1;
+let selectedType = 'trial';
+
+// ============================================================
+// DURATION LOGIC — Days + Hours + Minutes inputs
+// ============================================================
+
+function getTotalMs() {
+  const days    = parseInt(document.getElementById('dDays').value)    || 0;
+  const hours   = parseInt(document.getElementById('dHours').value)   || 0;
+  const minutes = parseInt(document.getElementById('dMinutes').value) || 0;
+  return (days * 86400 + hours * 3600 + minutes * 60) * 1000;
+}
+
+function getDurationLabel() {
+  const days    = parseInt(document.getElementById('dDays').value)    || 0;
+  const hours   = parseInt(document.getElementById('dHours').value)   || 0;
+  const minutes = parseInt(document.getElementById('dMinutes').value) || 0;
+  const parts = [];
+  if (days)    parts.push(days + 'd');
+  if (hours)   parts.push(hours + 'h');
+  if (minutes) parts.push(minutes + 'm');
+  return parts.length ? parts.join(' ') : '0m';
+}
+
+function updateExpiryPreview() {
+  const ms = getTotalMs();
+  const label = getDurationLabel();
+
+  const summaryEl = document.getElementById('durationSummary');
+  const previewEl = document.getElementById('expiryPreview');
+
+  if (ms <= 0) {
+    previewEl.value = '— দয়া করে সময় দিন';
+    if (summaryEl) summaryEl.textContent = '';
+    return;
+  }
+
+  const d = new Date(Date.now() + ms);
+
+  // Show date+time for short durations (< 3 days), date only for long
+  if (ms < 3 * 86400000) {
+    previewEl.value = d.toLocaleString('en-GB', {
+      day:'2-digit', month:'short', year:'numeric',
+      hour:'2-digit', minute:'2-digit'
+    });
+  } else {
+    previewEl.value = d.toLocaleDateString('en-GB', {
+      day:'2-digit', month:'short', year:'numeric'
+    });
+  }
+
+  // Human readable summary
+  const days    = parseInt(document.getElementById('dDays').value)    || 0;
+  const hours   = parseInt(document.getElementById('dHours').value)   || 0;
+  const minutes = parseInt(document.getElementById('dMinutes').value) || 0;
+  const parts = [];
+  if (days)    parts.push(days + ' দিন');
+  if (hours)   parts.push(hours + ' ঘন্টা');
+  if (minutes) parts.push(minutes + ' মিনিট');
+  if (summaryEl) summaryEl.textContent = 'মেয়াদ: ' + parts.join(' + ');
+}
+
+// Init
+updateExpiryPreview();
+
+// ============================================================
+// KEY GENERATOR
+// ============================================================
+function generateKeyCode() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const seg = n => Array.from({length:n}, () => chars[Math.floor(Math.random()*chars.length)]).join('');
+  return `${seg(5)}-${seg(5)}-${seg(5)}-${seg(5)}`;
+}
+
+function generateKeys() {
+  const count = Math.min(100, Math.max(1, parseInt(document.getElementById('keyCount').value) || 1));
+  const type  = document.getElementById('keyTypeLabel').value;
+  const ms    = getTotalMs();
+  const label = getDurationLabel();
+
+  if (ms <= 0) { log('⚠ সময় দিন — Days, Hours বা Minutes এ কিছু লিখুন', 'warn'); return; }
+
+  generatedKeys = [];
+  for (let i = 0; i < count; i++) {
+    generatedKeys.push({ code: generateKeyCode(), ms, label, type, added: false });
+  }
+
+  renderGeneratedKeys();
+  log(`✓ Generated ${count} key(s) — ${label} expiry [${type}]`, 'ok');
+}
+
+function renderGeneratedKeys() {
+  const list    = document.getElementById('generatedList');
+  const actions = document.getElementById('generateActions');
+
+  if (generatedKeys.length === 0) {
+    list.style.display = 'none';
+    actions.style.display = 'none';
+    return;
+  }
+
+  list.style.display = 'flex';
+  actions.style.display = 'flex';
+
+  list.innerHTML = generatedKeys.map((k, i) => {
+    const badgeClass  = k.type === 'trial' ? 'badge-trial' : k.type === 'monthly' ? 'badge-monthly' : 'badge-custom';
+    const statusClass = k.added ? 'status-added' : 'status-pending';
+    const statusText  = k.added ? '✓ Added' : 'Pending';
+    return `
+      <div class="key-item" id="keyitem-${i}">
+        <div class="key-code">${k.code}</div>
+        <span class="key-expiry-badge ${badgeClass}">${k.type.toUpperCase()} · ${k.label}</span>
+        <span class="key-status ${statusClass}" id="keystatus-${i}">${statusText}</span>
+        <button class="btn btn-outline btn-sm" onclick="copyKey('${k.code}')">Copy</button>
+      </div>`;
+  }).join('');
+}
+
+// ============================================================
+// SERVER OPERATIONS
+// ============================================================
+function getServerUrl() { return document.getElementById('serverUrl').value.trim().replace(/\/$/, ''); }
+function getAdminKey()  { return document.getElementById('adminKey').value.trim(); }
+
+async function testServer() {
+  const url = getServerUrl();
+  setServerStatus('yellow', 'Testing...');
+  log('Testing server: ' + url, 'info');
+  try {
+    const res = await fetch(url);
+    const data = await res.json();
+    if (data.status && data.status.includes('OXOKE')) {
+      setServerStatus('green', `Connected · ${data.version || 'v?'}`);
+      log('✓ Server connected: ' + data.status, 'ok');
+      loadStats();
+      loadRetryStatus(); // auto-load retry status after connect
+    } else {
+      setServerStatus('red', 'Unknown response');
+      log('⚠ Unexpected response', 'warn');
+    }
+  } catch(e) {
+    setServerStatus('red', 'Connection failed');
+    log('✗ Connection failed: ' + e.message, 'err');
+  }
+}
+
+function setServerStatus(color, text) {
+  const dot = document.querySelector('.server-status .dot');
+  dot.className = 'dot ' + color;
+  document.getElementById('serverStatusText').textContent = text;
+}
+
+async function loadStats() {
+  try {
+    const res = await fetch(getServerUrl() + '/admin/codes', {
+      headers: { 'x-admin-key': getAdminKey() }
+    });
+    const data = await res.json();
+    if (data.codes) {
+      const codes = Object.values(data.codes);
+      const active = codes.filter(c => c.active && !c.expired).length;
+      const inUse = codes.filter(c => c.locked_pc && c.locked_pc !== '○ Free').length;
+      document.getElementById('statTotal').textContent = data.total;
+      document.getElementById('statActive').textContent = active;
+      document.getElementById('statInUse').textContent = inUse;
+      document.getElementById('statFree').textContent = active - inUse;
+      log(`✓ Stats loaded: ${data.total} total, ${active} active, ${inUse} in use`, 'ok');
+    }
+  } catch(e) {
+    log('✗ Stats load failed: ' + e.message, 'err');
+  }
+}
+
+async function addAllToServer() {
+  const pending = generatedKeys.filter(k => !k.added);
+  if (pending.length === 0) { log('All keys already added.', 'warn'); return; }
+
+  const btn = document.getElementById('addServerBtn');
+  btn.disabled = true;
+  btn.textContent = 'Adding...';
+
+  let added = 0, failed = 0;
+  for (let i = 0; i < generatedKeys.length; i++) {
+    const k = generatedKeys[i];
+    if (k.added) continue;
+    try {
+      const res = await fetch(getServerUrl() + '/admin/add-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-admin-key': getAdminKey() },
+        body: JSON.stringify({ code: k.code, expiry_ms: k.ms, expiry_label: k.label, key_type: k.type })
+      });
+      const result = await res.json();
+      if (result.success || result.error === 'Already exists') {
+        generatedKeys[i].added = true;
+        const el = document.getElementById('keystatus-' + i);
+        if (el) { el.textContent = '✓ Added'; el.className = 'key-status status-added'; }
+        added++;
+      } else {
+        failed++;
+        log(`✗ Failed: ${k.code} — ${result.error}`, 'err');
+      }
+    } catch(e) {
+      failed++;
+    }
+  }
+
+  btn.disabled = false;
+  btn.innerHTML = '✓ ADD ALL TO SERVER';
+  log(`✓ Complete! Added: ${added} | Failed: ${failed}`, 'ok');
+  loadStats();
+}
+
+async function loadAllKeys() {
+  log('Loading all keys from server...', 'info');
+  try {
+    const res = await fetch(getServerUrl() + '/admin/codes', {
+      headers: { 'x-admin-key': getAdminKey() }
+    });
+    const data = await res.json();
+    if (!data.codes) { log('✗ Failed to load keys', 'err'); return; }
+
+    const tbody = document.getElementById('keysTableBody');
+    const entries = Object.entries(data.codes);
+
+    if (entries.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:20px;">No keys found</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = entries.map(([code, info]) => {
+      const isExpired = info.expired;
+      const isLocked = info.locked_pc && info.locked_pc !== '○ Free';
+      const statusBadge = !info.active
+        ? '<span class="disabled-badge">DISABLED</span>'
+        : isExpired
+          ? '<span class="expired-badge">EXPIRED</span>'
+          : '<span class="active-badge">ACTIVE</span>';
+      const lockBadge = isLocked
+        ? '<span class="locked-badge">LOCKED</span>'
+        : '<span class="free-badge">FREE</span>';
+      const typeGuess = code.startsWith('TRIAL') ? 'trial' : 'monthly';
+      const typeBadge = typeGuess === 'trial'
+        ? '<span class="key-expiry-badge badge-trial">TRIAL</span>'
+        : '<span class="key-expiry-badge badge-monthly">MONTHLY</span>';
+
+      return `<tr>
+        <td class="code-cell">${code}</td>
+        <td>${typeBadge}</td>
+        <td class="status-cell">${statusBadge}</td>
+        <td>${lockBadge}</td>
+        <td style="font-size:11px;color:var(--muted);">${info.expiry || '—'}</td>
+        <td style="font-size:11px;color:var(--muted);">${info.created || '—'}</td>
+        <td>
+          <div style="display:flex;gap:5px;">
+            <button class="btn btn-outline btn-sm" onclick="copyKey('${code}')">Copy</button>
+            ${info.active ? `<button class="btn btn-red btn-sm" onclick="disableKey('${code}')">Disable</button>` : ''}
+            ${isLocked ? `<button class="btn btn-outline btn-sm" onclick="resetKey('${code}')">Reset PC</button>` : ''}
+          </div>
+        </td>
+      </tr>`;
+    }).join('');
+
+    log(`✓ Loaded ${entries.length} keys from server`, 'ok');
+    loadStats();
+  } catch(e) {
+    log('✗ Load failed: ' + e.message, 'err');
+  }
+}
+
+async function disableKey(code) {
+  if (!confirm(`Disable key: ${code}?\nActivated users will lose access.`)) return;
+  try {
+    const res = await fetch(getServerUrl() + '/admin/disable-code', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-admin-key': getAdminKey() },
+      body: JSON.stringify({ code })
+    });
+    const data = await res.json();
+    if (data.success) {
+      log(`✓ Key disabled: ${code}`, 'ok');
+      loadAllKeys();
+    }
+  } catch(e) {
+    log('✗ Disable failed: ' + e.message, 'err');
+  }
+}
+
+async function resetKey(code) {
+  if (!confirm(`Reset PC lock for: ${code}?\nThis allows activation on a new PC.`)) return;
+  try {
+    const res = await fetch(getServerUrl() + '/admin/reset-code', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-admin-key': getAdminKey() },
+      body: JSON.stringify({ code })
+    });
+    const data = await res.json();
+    if (data.success) {
+      log(`✓ PC lock reset for: ${code}`, 'ok');
+      loadAllKeys();
+    }
+  } catch(e) {
+    log('✗ Reset failed: ' + e.message, 'err');
+  }
+}
+
+// ============================================================
+// COPY / DOWNLOAD
+// ============================================================
+function copyKey(code) {
+  navigator.clipboard.writeText(code).then(() => showToast('Copied: ' + code));
+}
+
+function copyAll() {
+  const text = generatedKeys.map(k => `${k.code}  [${k.type} · ${k.label}]`).join('\n');
+  navigator.clipboard.writeText(text).then(() => showToast(generatedKeys.length + ' keys copied!'));
+}
+
+function downloadTxt() {
+  const now = new Date().toISOString().split('T')[0];
+  const lines = ['OXOKE ADS BLOCKER - LICENSE KEYS', '=' .repeat(45), `Generated: ${now}`, ''];
+  generatedKeys.forEach(k => {
+    lines.push(`KEY:    ${k.code}`);
+    lines.push(`TYPE:   ${k.type.toUpperCase()}`);
+    lines.push(`EXPIRY: ${k.days} days from activation`);
+    lines.push('-'.repeat(45));
+  });
+  const blob = new Blob([lines.join('\n')], { type: 'text/plain' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `oxoke-keys-${now}.txt`;
+  a.click();
+  log(`✓ Downloaded ${generatedKeys.length} keys as TXT`, 'ok');
+}
+
+function clearGenerated() {
+  generatedKeys = [];
+  renderGeneratedKeys();
+  document.getElementById('generatedList').style.display = 'none';
+  document.getElementById('generateActions').style.display = 'none';
+}
+
+// ============================================================
+// LOG
+// ============================================================
+function log(msg, type = 'info') {
+  const el = document.getElementById('activityLog');
+  const time = new Date().toLocaleTimeString();
+  const cls = type === 'ok' ? 'log-ok' : type === 'err' ? 'log-err' : type === 'warn' ? 'log-warn' : 'log-info';
+  el.innerHTML += `<div class="log-line ${cls}">[${time}] ${msg}</div>`;
+  el.scrollTop = el.scrollHeight;
+}
+
+function clearLog() {
+  document.getElementById('activityLog').innerHTML = '<div class="log-info log-line">[ Log cleared ]</div>';
+}
+
+// ============================================================
+// TOAST
+// ============================================================
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// ============================================================
+// TRIAL DURATION SETTINGS
+// ============================================================
+function setTrialPreset(days, hours, minutes) {
+  document.getElementById('trialDays').value = days;
+  document.getElementById('trialHours').value = hours;
+  document.getElementById('trialMinutes').value = minutes;
+}
+
+async function loadRetryStatus(manual=false) {
+    const url = document.getElementById('serverUrl').value.trim();
+    const key = document.getElementById('adminKey').value.trim();
+    const msg = document.getElementById('retryMsg');
+    if (!url || !key) { return; }
+    if(msg) msg.textContent = '';
+    try {
+      const r = await fetch(url+'/api/admin/get-retry-trial',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({admin_key:key})});
+      const d = await r.json();
+      if (d.success) { applyRetryUI(d.allow_retry_trial); if(msg)msg.textContent=''; }
+      else if(manual) { if(msg){msg.textContent='❌ '+d.message;msg.style.color='var(--red)';} }
+    } catch(e) {
+      if(manual && msg){msg.textContent='❌ Server connect failed';msg.style.color='var(--red)';}
+    }
+  }
+
+  async function setRetryTrial(enabled) {
+    const url = document.getElementById('serverUrl').value.trim();
+    const key = document.getElementById('adminKey').value.trim();
+    const msg = document.getElementById('retryMsg');
+    const tog = document.getElementById('retryTrialToggle');
+    if (!url || !key) { if(tog)tog.checked=!enabled; if(msg){msg.textContent='⚠ Server URL ও Admin Key দিন';msg.style.color='var(--yellow)';}return; }
+    try {
+      const r = await fetch(url+'/api/admin/set-retry-trial',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({admin_key:key,allow_retry_trial:enabled})});
+      const d = await r.json();
+      if (d.success) {
+        applyRetryUI(d.allow_retry_trial);
+        if(msg){ msg.textContent = d.allow_retry_trial ? '✅ Retry Trial ON — Expired users can retry now' : '✅ Retry Trial OFF — Expired users blocked again'; msg.style.color = d.allow_retry_trial ? 'var(--green)' : 'var(--muted)'; }
+      } else { if(tog)tog.checked=!enabled; if(msg){msg.textContent='❌ '+d.message;msg.style.color='var(--red)';} }
+    } catch(e) { if(tog)tog.checked=!enabled; if(msg){msg.textContent='❌ Server connect failed';msg.style.color='var(--red)';} }
+  }
+
+  function applyRetryUI(isOn) {
+    const tog    = document.getElementById('retryTrialToggle');
+    const slider = document.getElementById('retrySlider');
+    const knob   = document.getElementById('retryKnob');
+    const label  = document.getElementById('retryStatusLabel');
+    if(!tog) return;
+    tog.checked = isOn;
+    if (isOn) {
+      slider.style.background='var(--green)'; slider.style.borderColor='var(--green)';
+      knob.style.background='#fff'; knob.style.transform='translateX(24px)';
+      label.textContent='ON'; label.style.color='var(--green)';
+    } else {
+      slider.style.background='#333'; slider.style.borderColor='var(--border)';
+      knob.style.background='var(--muted)'; knob.style.transform='translateX(0)';
+      label.textContent='OFF'; label.style.color='var(--muted)';
+    }
+  }
+
+  // Retry status loads automatically after server TEST button connects
+
+  async function loadTrialDuration() {
+  const url = document.getElementById('serverUrl').value.trim();
+  const key = document.getElementById('adminKey').value.trim();
+  const msg = document.getElementById('trialMsg');
+  try {
+    const res = await fetch(url + '/api/admin/trial-config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ admin_key: key })
+    });
+    const data = await res.json();
+    if (data.success) {
+      const totalMs = data.trial_duration_ms || (2 * 3600 * 1000);
+      const h = Math.floor(totalMs / 3600000);
+      const m = Math.floor((totalMs % 3600000) / 60000);
+      document.getElementById('trialHours').value = h;
+      document.getElementById('trialMinutes').value = m;
+      msg.style.color = 'var(--green)';
+      msg.textContent = '✓ Current trial: ' + h + 'h ' + m + 'm';
+    } else {
+      msg.style.color = 'var(--yellow)';
+      msg.textContent = '⚠ ' + (data.message || 'Could not load');
+    }
+  } catch(e) {
+    msg.style.color = 'var(--muted)';
+    msg.textContent = 'Using default: 0d 2h 0m';
+  }
+}
+
+async function saveTrialDuration() {
+  const url = document.getElementById('serverUrl').value.trim();
+  const key = document.getElementById('adminKey').value.trim();
+  const msg = document.getElementById('trialMsg');
+  const days    = parseInt(document.getElementById('trialDays').value)    || 0;
+  const hours   = parseInt(document.getElementById('trialHours').value)   || 0;
+  const minutes = parseInt(document.getElementById('trialMinutes').value) || 0;
+  const totalMs = (days * 86400 + hours * 3600 + minutes * 60) * 1000;
+
+  if (totalMs < 60000) {
+    msg.style.color = 'var(--red)';
+    msg.textContent = '⚠ Minimum 1 minute required!';
+    return;
+  }
+
+  const btn = document.getElementById('saveTrialBtn');
+  btn.disabled = true;
+  btn.textContent = 'Saving...';
+  msg.textContent = '';
+
+  try {
+    const res = await fetch(url + '/api/admin/set-trial-duration', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ admin_key: key, duration_ms: totalMs })
+    });
+    const data = await res.json();
+    if (data.success) {
+      msg.style.color = 'var(--green)';
+      msg.textContent = '✓ Trial duration saved: ' + hours + 'h ' + minutes + 'm';
+    } else {
+      msg.style.color = 'var(--red)';
+      msg.textContent = '⚠ ' + (data.message || 'Save failed');
+    }
+  } catch(e) {
+    msg.style.color = 'var(--red)';
+    msg.textContent = '⚠ Server connection failed';
+  }
+  btn.disabled = false;
+  btn.textContent = '💾 SAVE TRIAL DURATION';
+}
+
+// ============================================================
+// AUTO INIT
+// ============================================================
+window.addEventListener('load', () => {
+  testServer();
+});
+</script>
+</body>
+</html>
