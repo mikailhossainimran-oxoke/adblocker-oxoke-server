@@ -142,11 +142,12 @@ app.post('/api/check-trial-status', (req, res) => {
   const trials = loadTrials();
   const record = trials.used_pcs[hashedPc];
   if (!record) return res.json({ used: false });
-  // Check if trial actually expired (not just used)
   const expired = record.expiry && Date.now() > new Date(record.expiry).getTime();
-  return res.json({ used: expired, expiry: record.expiry || null });
+  const cfg = loadConfig();
+  const retryAllowed = cfg.allow_retry_trial || false;
+  // If expired but retry is allowed — tell extension to reset local trial state
+  return res.json({ used: expired, expiry: record.expiry || null, retry_allowed: retryAllowed });
 });
-
 
 // ==============================
 app.get('/api/trial-duration', (req, res) => {
