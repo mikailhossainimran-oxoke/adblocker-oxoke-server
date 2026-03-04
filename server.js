@@ -137,11 +137,17 @@ app.get('/', (req, res) => {
 // POST /api/get-trial
 // প্রতিটা PC তে একবার ১ দিনের free trial
 // ==============================
-app.post('/api/get-trial', (req, res) => {
+app.post('/api/get-trial', async (req, res) => {
   const { pc_fingerprint } = req.body;
   if (!pc_fingerprint) return res.status(400).json({ success: false, message: 'Missing pc_fingerprint' });
 
   const hashedPc = hashId(pc_fingerprint);
+
+  // GitHub data না থাকলে load করার চেষ্টা করো
+  if (!_trialsMemory && GITHUB_TOKEN && GITHUB_REPO) {
+    await loadTrialsFromGitHub().catch(() => {});
+  }
+
   const trials = loadTrials();
 
   // এই PC আগে trial নিয়েছে?
