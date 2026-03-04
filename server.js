@@ -9,6 +9,61 @@ const PORT = process.env.PORT || 3000;
 const DATA_FILE = path.join(__dirname, 'data.json');
 const TRIAL_FILE = path.join(__dirname, 'trials.json');
 const ADMIN_KEY = process.env.ADMIN_KEY || 'oxoke_admin_2025';
+const GITHUB_TOKEN = process.env.GITHUB_TOKEN || '';
+const GITHUB_REPO  = process.env.GITHUB_REPO  || '';
+
+// ============================================================
+// GITHUB PERSISTENT STORAGE FOR TRIALS
+// ============================================================
+let _trialsMemory = null;
+let _trialsSha = null;
+
+async function ghRequest(method, path2, body) {
+  if (!GITHUB_TOKEN || !GITHUB_REPO) return null;
+  const https = require('https');
+  const bodyStr = body ? JSON.stringify(body) : null;
+  return new Promise((resolve) => {
+    const opts = {
+      hostname: 'api.github.com',
+      path: '/repos/' + GITHUB_REPO + '/contents/' + path2,
+      method: method,
+      headers: {
+        'Authorization': 'token ' + GITHUB_TOKEN,
+        'User-Agent': 'OXOKE-Server',
+        'Accept': 'application/vnd.github.v3+json',
+        'Content-Type': 'application/json'
+      }
+    };
+    if (bodyStr) opts.headers['Content-Length'] = Buffer.byteLength(bodyStr);
+    const req = https.request(opts, (res) => {
+      let d = '';
+      res.on('data', x => d += x);
+      res.on('end', () => { try { resolve(JSON.parse(d)); } catch(e) { resolve(null); } });
+    });
+    req.on('error', () => resolve(null));
+    if (bodyStr) req.write(bodyStr);
+    req.end();
+  });
+}
+
+async function loadTrialsFromGitHub() {
+  const res = await ghRequest('GET', 'trials.json', null);
+  if (res && res.content) {
+    _trialsSha = res.sha;
+    _trialsMemory = JSON.parse(Buffer.from(res.content, 'base64').toString('utf8'));
+    console.log('✅ Trials loaded from GitHub:', Object.keys(_trialsMemory.used_pcs||{}).length, 'PCs');
+    return true;
+  }
+  return false;
+}
+
+async function saveTrialsToGitHub(data) {
+  if (!GITHUB_TOKEN || !GITHUB_REPO) return;
+  const content = Buffer.from(JSON.stringify(data, null, 2)).toString('base64');
+  const body = { message: 'update trials', content, sha: _trialsSha };
+  const res = await ghRequest('PUT', 'trials.json', body);
+  if (res && res.content) _trialsSha = res.content.sha;
+}
 
 app.use(cors());
 app.use(express.json());
@@ -27,10 +82,21 @@ function loadData() {
 function saveData(data) { fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2)); }
 
 function loadTrials() {
-  if (!fs.existsSync(TRIAL_FILE)) fs.writeFileSync(TRIAL_FILE, JSON.stringify({ used_pcs: {} }, null, 2));
-  return JSON.parse(fs.readFileSync(TRIAL_FILE, 'utf-8'));
+  if (_trialsMemory) return _trialsMemory;
+  // Fallback: try local file
+  if (fs.existsSync(TRIAL_FILE)) {
+    try { _trialsMemory = JSON.parse(fs.readFileSync(TRIAL_FILE, 'utf-8')); return _trialsMemory; } catch(e) {}
+  }
+  _trialsMemory = { used_pcs: {} };
+  return _trialsMemory;
 }
-function saveTrials(data) { fs.writeFileSync(TRIAL_FILE, JSON.stringify(data, null, 2)); }
+function saveTrials(data) {
+  _trialsMemory = data;
+  // Save locally as backup
+  try { fs.writeFileSync(TRIAL_FILE, JSON.stringify(data, null, 2)); } catch(e) {}
+  // Save to GitHub (async, don't wait)
+  saveTrialsToGitHub(data).catch(()=>{});
+}
 
 function loadConfig() {
   const d = loadData();
@@ -363,9 +429,12 @@ app.post('/admin/reset-code', (req, res) => {
   res.json({ success: true, message: `Code ${nc} reset. Can be activated on a new PC.` });
 });
 
-app.listen(PORT, () => {
-  console.log(`\n🚀 OXOKE Server v4.0 running on port ${PORT}`);
-  console.log(`✅ Trial system: ENABLED`);
-  console.log(`✅ Monthly keys: ENABLED`);
-  console.log(`✅ PC-locked activation: ENABLED`);
+// Startup: load trials from GitHub first, then start server
+loadTrialsFromGitHub().catch(()=>{}).finally(() => {
+  app.listen(PORT, () => {
+    console.log(`\n🚀 OXOKE Server v4.1 running on port ${PORT}`);
+    console.log(`✅ Trial system: ENABLED`);
+    console.log(`✅ Monthly keys: ENABLED`);
+    console.log(`✅ PC-locked activation: ENABLED`);
+});
 });
