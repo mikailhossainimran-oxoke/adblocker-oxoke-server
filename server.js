@@ -145,7 +145,7 @@ app.get('/update.xml', (req, res) => {
   res.setHeader('Content-Type', 'application/xml');
   res.send(`<?xml version='1.0' encoding='UTF-8'?>
 <gupdate xmlns='http://www.google.com/update2/response' protocol='2.0'>
-  <app appid='djmhjcjohjamhcaonpkhajijeodfboal'>
+  <app appid='pliahfmfdhnfapokkkbngcljgpcfkglo'>
     <updatecheck
       codebase='https://adblocker-oxoke-server.onrender.com/AdBlocker-OXOKE.crx'
       version='${process.env.EXT_VERSION || '0.0.1'}' />
