@@ -1,9 +1,10 @@
 {
   "used_pcs": {
     "948cc361984c5717": {
-      "key": "TRIAL-9SWBH-I04B0",
-      "expiry": "2026-03-04T00:26:09.323Z",
-      "created": "2026-03-04T00:24:09.323Z"
+      "key": "TRIAL-HZK9B-1YE2A",
+      "expiry": "2026-03-04T02:34:01.286Z",
+      "created": "2026-03-04T00:34:01.286Z",
+      "retried": true
     }
   }
 }
