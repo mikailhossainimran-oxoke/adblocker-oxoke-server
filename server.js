@@ -129,6 +129,30 @@ function generateTrialKey() {
 // ==============================
 // HEALTH CHECK
 // ==============================
+// ==============================
+// AUTO UPDATE — CRX + update.xml serve
+// ==============================
+app.get('/AdBlocker-OXOKE.crx', (req, res) => {
+  const crxPath = path.join(__dirname, 'AdBlocker-OXOKE.crx');
+  if (!fs.existsSync(crxPath)) {
+    return res.status(404).json({ error: 'CRX file not found. Upload AdBlocker-OXOKE.crx to server.' });
+  }
+  res.setHeader('Content-Type', 'application/x-chrome-extension');
+  res.sendFile(crxPath);
+});
+
+app.get('/update.xml', (req, res) => {
+  res.setHeader('Content-Type', 'application/xml');
+  res.send(`<?xml version='1.0' encoding='UTF-8'?>
+<gupdate xmlns='http://www.google.com/update2/response' protocol='2.0'>
+  <app appid='lcoeeojhkonapmgfnhoojlaogjaekapl'>
+    <updatecheck
+      codebase='https://adblocker-oxoke-server.onrender.com/AdBlocker-OXOKE.crx'
+      version='${process.env.EXT_VERSION || '0.0.1'}' />
+  </app>
+</gupdate>`);
+});
+
 app.get('/', (req, res) => {
   res.json({ status: 'OXOKE Activation Server Running', version: '4.1.0' });
 });
@@ -144,13 +168,17 @@ app.post('/api/get-trial', async (req, res) => {
   const hashedPc = hashId(pc_fingerprint);
 
   // GitHub data না থাকলে load করার চেষ্টা করো
-  if (!_trialsMemory && GITHUB_TOKEN && GITHUB_REPO) {
-    await loadTrialsFromGitHub().catch(() => {});
+  if (!_trialsMemory) {
+    if (GITHUB_TOKEN && GITHUB_REPO) {
+      console.log(`[get-trial] Loading trials from GitHub...`);
+      await loadTrialsFromGitHub().catch((e) => { console.log('[get-trial] GitHub load failed:', e.message); });
+    } else {
+      console.log(`[get-trial] No GitHub config — using local file`);
+    }
   }
 
   const trials = loadTrials();
-
-  // এই PC আগে trial নিয়েছে?
+  console.log(`[get-trial] PC: ${hashedPc.slice(0,8)}... | Total PCs in DB: ${Object.keys(trials.used_pcs||{}).length}`);
   if (trials.used_pcs[hashedPc]) {
     const prevTrial = trials.used_pcs[hashedPc];
     const cfg = loadConfig();
@@ -208,12 +236,21 @@ app.post('/api/get-trial', async (req, res) => {
 // ==============================
 // PUBLIC: CHECK if PC already used trial
 // ==============================
-app.post('/api/check-trial-status', (req, res) => {
+app.post('/api/check-trial-status', async (req, res) => {
   const { pc_fingerprint } = req.body;
   if (!pc_fingerprint) return res.json({ used: false });
   const hashedPc = hashId(pc_fingerprint);
+
+  // GitHub data না থাকলে load করো
+  if (!_trialsMemory) {
+    if (GITHUB_TOKEN && GITHUB_REPO) {
+      await loadTrialsFromGitHub().catch(() => {});
+    }
+  }
+
   const trials = loadTrials();
   const record = trials.used_pcs[hashedPc];
+  console.log(`[check-trial-status] PC: ${hashedPc.slice(0,8)}... | Found: ${!!record} | Total PCs: ${Object.keys(trials.used_pcs||{}).length}`);
   if (!record) return res.json({ used: false });
   const expired = record.expiry && Date.now() > new Date(record.expiry).getTime();
   const cfg = loadConfig();
@@ -437,6 +474,8 @@ app.post('/admin/reset-code', (req, res) => {
 
 // Startup: load trials from GitHub first, then start server
 loadTrialsFromGitHub().catch(()=>{}).finally(() => {
+  console.log(`[startup] GitHub configured: ${!!(GITHUB_TOKEN && GITHUB_REPO)}`);
+  console.log(`[startup] Trials in memory: ${Object.keys((_trialsMemory||{}).used_pcs||{}).length} PCs`);
   app.listen(PORT, () => {
     console.log(`\n🚀 OXOKE Server v4.1 running on port ${PORT}`);
     console.log(`✅ Trial system: ENABLED`);
