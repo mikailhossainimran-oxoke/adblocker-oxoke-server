@@ -17,6 +17,8 @@ const GITHUB_REPO  = process.env.GITHUB_REPO  || '';
 // ============================================================
 let _trialsMemory = null;
 let _trialsSha = null;
+let _configMemory = null;
+let _configSha = null;
 
 async function ghRequest(method, path2, body) {
   if (!GITHUB_TOKEN || !GITHUB_REPO) return null;
@@ -98,18 +100,53 @@ function saveTrials(data) {
   saveTrialsToGitHub(data).catch(()=>{});
 }
 
+async function loadConfigFromGitHub() {
+  if (!GITHUB_TOKEN || !GITHUB_REPO) return false;
+  const res = await ghRequest('GET', 'oxoke-config.json', null);
+  if (res && res.content) {
+    _configSha = res.sha;
+    _configMemory = JSON.parse(Buffer.from(res.content, 'base64').toString('utf8'));
+    console.log('✅ Config loaded from GitHub');
+    return true;
+  }
+  return false;
+}
+
+async function saveConfigToGitHub(cfg) {
+  if (!GITHUB_TOKEN || !GITHUB_REPO) return;
+  const content = Buffer.from(JSON.stringify(cfg, null, 2)).toString('base64');
+  const body = { message: 'update config', content, sha: _configSha };
+  const res = await ghRequest('PUT', 'oxoke-config.json', body);
+  if (res && res.content) _configSha = res.content.sha;
+}
+
 function loadConfig() {
+  // Memory থেকে আগে দেখো
+  if (_configMemory) return {
+    trial_duration_ms: _configMemory.trial_duration_ms || (2 * 60 * 60 * 1000),
+    allow_retry_trial: _configMemory.allow_retry_trial || false,
+    trial_enabled: _configMemory.trial_enabled !== undefined ? _configMemory.trial_enabled : true,
+    extension_enabled: _configMemory.extension_enabled !== undefined ? _configMemory.extension_enabled : true
+  };
+  // Fallback: local file
   const d = loadData();
   return {
     trial_duration_ms: d.trial_duration_ms || (2 * 60 * 60 * 1000),
-    allow_retry_trial: d.allow_retry_trial || false
+    allow_retry_trial: d.allow_retry_trial || false,
+    trial_enabled: d.trial_enabled !== undefined ? d.trial_enabled : true,
+    extension_enabled: d.extension_enabled !== undefined ? d.extension_enabled : true
   };
 }
+
 function saveConfig(cfg) {
+  // Memory update
+  _configMemory = cfg;
+  // Local file update
   const d = loadData();
-  d.trial_duration_ms = cfg.trial_duration_ms;
-  if (cfg.allow_retry_trial !== undefined) d.allow_retry_trial = cfg.allow_retry_trial;
+  Object.assign(d, cfg);
   fs.writeFileSync(DATA_FILE, JSON.stringify(d, null, 2));
+  // GitHub save (async)
+  saveConfigToGitHub(cfg).catch(()=>{});
 }
 
 function hashId(id) {
@@ -177,6 +214,15 @@ app.post('/api/get-trial', async (req, res) => {
     }
   }
 
+  // Trial enabled check
+  const cfgCheck = loadConfig();
+  if (!cfgCheck.extension_enabled) {
+    return res.status(403).json({ success: false, message: 'Extension under maintenance.', maintenance: true });
+  }
+  if (!cfgCheck.trial_enabled) {
+    return res.status(403).json({ success: false, message: 'Free trial is currently disabled.', trial_disabled: true });
+  }
+
   const trials = loadTrials();
   console.log(`[get-trial] PC: ${hashedPc.slice(0,8)}... | Total PCs in DB: ${Object.keys(trials.used_pcs||{}).length}`);
   if (trials.used_pcs[hashedPc]) {
@@ -240,6 +286,16 @@ app.post('/api/get-trial', async (req, res) => {
 app.post('/api/check-trial-status', async (req, res) => {
   const { pc_fingerprint } = req.body;
   if (!pc_fingerprint) return res.json({ used: false });
+  
+  // Extension/trial enabled check
+  const statusCfg = loadConfig();
+  if (!statusCfg.extension_enabled) {
+    return res.json({ maintenance: true, used: false });
+  }
+  if (!statusCfg.trial_enabled) {
+    return res.json({ trial_disabled: true, used: false });
+  }
+  
   const hashedPc = hashId(pc_fingerprint);
 
   // GitHub data না থাকলে load করো
@@ -500,8 +556,69 @@ app.post('/admin/reset-code', (req, res) => {
   res.json({ success: true, message: `Code ${nc} reset. Can be activated on a new PC.` });
 });
 
+
+// ==============================
+// ADMIN: Get full config
+// ==============================
+app.post('/api/admin/get-config', async (req, res) => {
+  const { admin_key } = req.body;
+  if (admin_key !== ADMIN_KEY) return res.status(403).json({ success: false });
+  if (!_configMemory) await loadConfigFromGitHub().catch(()=>{});
+  const cfg = loadConfig();
+  return res.json({ success: true, config: cfg });
+});
+
+// ==============================
+// ADMIN: Set trial enabled
+// ==============================
+app.post('/api/admin/set-trial-enabled', async (req, res) => {
+  const { admin_key, trial_enabled } = req.body;
+  if (admin_key !== ADMIN_KEY) return res.status(403).json({ success: false });
+  const cfg = loadConfig();
+  cfg.trial_enabled = !!trial_enabled;
+  saveConfig(cfg);
+  return res.json({ success: true, trial_enabled: cfg.trial_enabled });
+});
+
+// ==============================
+// ADMIN: Set extension enabled
+// ==============================
+app.post('/api/admin/set-extension-enabled', async (req, res) => {
+  const { admin_key, extension_enabled } = req.body;
+  if (admin_key !== ADMIN_KEY) return res.status(403).json({ success: false });
+  const cfg = loadConfig();
+  cfg.extension_enabled = !!extension_enabled;
+  saveConfig(cfg);
+  return res.json({ success: true, extension_enabled: cfg.extension_enabled });
+});
+
+// ==============================
+// ADMIN: Reset all trials
+// ==============================
+app.post('/api/admin/reset-trials', async (req, res) => {
+  const { admin_key } = req.body;
+  if (admin_key !== ADMIN_KEY) return res.status(403).json({ success: false });
+  const fresh = { used_pcs: {} };
+  saveTrials(fresh);
+  return res.json({ success: true, message: 'All trial history cleared.' });
+});
+
+// ==============================
+// PUBLIC: Get extension status
+// ==============================
+app.get('/api/status', (req, res) => {
+  const cfg = loadConfig();
+  return res.json({
+    extension_enabled: cfg.extension_enabled !== false,
+    trial_enabled: cfg.trial_enabled !== false
+  });
+});
+
 // Startup: load trials from GitHub first, then start server
-loadTrialsFromGitHub().catch(()=>{}).finally(() => {
+Promise.all([
+  loadTrialsFromGitHub().catch(()=>{}),
+  loadConfigFromGitHub().catch(()=>{})
+]).finally(() => {
   console.log(`[startup] GitHub configured: ${!!(GITHUB_TOKEN && GITHUB_REPO)}`);
   console.log(`[startup] Trials in memory: ${Object.keys((_trialsMemory||{}).used_pcs||{}).length} PCs`);
   app.listen(PORT, () => {
