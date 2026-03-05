@@ -16,7 +16,7 @@
       "expiry": "2026-03-05T18:50:15.905Z",
       "created": "2026-03-05T18:49:15.905Z",
       "retried": true,
-      "retry_used": true
+      "retry_used": false
     }
   }
 }
