@@ -256,11 +256,10 @@ app.post('/api/check-trial-status', async (req, res) => {
   const record = trials.used_pcs[hashedPc];
   console.log(`[check-trial-status] PC: ${hashedPc.slice(0,8)}... | Found: ${!!record} | Total PCs: ${Object.keys(trials.used_pcs||{}).length}`);
   if (!record) return res.json({ used: false });
-  const expired = record.expiry && Date.now() > new Date(record.expiry).getTime();
+  // Record আছে মানেই এই PC trial নিয়েছে — expired হোক বা না হোক
   const cfg = loadConfig();
   const retryAllowed = cfg.allow_retry_trial || false;
-  // If expired but retry is allowed — tell extension to reset local trial state
-  return res.json({ used: expired, expiry: record.expiry || null, retry_allowed: retryAllowed });
+  return res.json({ used: true, expiry: record.expiry || null, retry_allowed: retryAllowed });
 });
 
 // ==============================
