@@ -194,12 +194,13 @@ app.post('/api/get-trial', async (req, res) => {
       });
     } else {
       // Trial শেষ হয়ে গেছে — retry allowed?
-      if (cfg.allow_retry_trial) {
-        // Admin allowed retry — give fresh trial
+      if (cfg.allow_retry_trial && !trials.used_pcs[hashedPc].retry_used) {
+        // Admin allowed retry — ১বারের জন্য fresh trial দাও
         const trialDurationMs = cfg.trial_duration_ms || (2 * 60 * 60 * 1000);
         const newExpiry = new Date(Date.now() + trialDurationMs).toISOString();
         const newKey = generateTrialKey();
-        trials.used_pcs[hashedPc] = { key: newKey, expiry: newExpiry, created: new Date().toISOString(), retried: true };
+        // retry_used = true — পরের বার আর retry পাবে না
+        trials.used_pcs[hashedPc] = { key: newKey, expiry: newExpiry, created: new Date().toISOString(), retried: true, retry_used: true };
         saveTrials(trials);
         return res.json({ success: true, key: newKey, expiry: newExpiry, type: 'trial', duration_ms: trialDurationMs, message: 'Trial restarted by admin.' });
       }
@@ -256,10 +257,18 @@ app.post('/api/check-trial-status', async (req, res) => {
   const record = trials.used_pcs[hashedPc];
   console.log(`[check-trial-status] PC: ${hashedPc.slice(0,8)}... | Found: ${!!record} | Total PCs: ${Object.keys(trials.used_pcs||{}).length}`);
   if (!record) return res.json({ used: false });
-  // Record আছে মানেই এই PC trial নিয়েছে — expired হোক বা না হোক
+  // Record আছে মানেই এই PC trial নিয়েছে
   const cfg = loadConfig();
-  const retryAllowed = cfg.allow_retry_trial || false;
-  return res.json({ used: true, expiry: record.expiry || null, retry_allowed: retryAllowed });
+  const isExpired = record.expiry && Date.now() > new Date(record.expiry).getTime();
+  
+  // Trial এখনো active (expired না) → resume করতে দাও
+  if (!isExpired) {
+    return res.json({ used: true, active: true, expiry: record.expiry, retry_allowed: false });
+  }
+  
+  // Trial expired — retry check
+  const retryAllowed = (cfg.allow_retry_trial && !record.retry_used) || false;
+  return res.json({ used: true, active: false, expiry: record.expiry || null, retry_allowed: retryAllowed });
 });
 
 // ==============================
@@ -308,8 +317,24 @@ app.post('/api/admin/set-retry-trial', (req, res) => {
   const { admin_key, allow_retry_trial } = req.body;
   if (admin_key !== ADMIN_KEY) return res.status(403).json({ success: false, message: 'Invalid admin key' });
   const cfg = loadConfig();
-  cfg.allow_retry_trial = !!allow_retry_trial;
+  const wasOff = !cfg.allow_retry_trial;
+  const turningOn = !!allow_retry_trial;
+  cfg.allow_retry_trial = turningOn;
   saveConfig(cfg);
+  
+  // OFF → ON করলে সব PC এর retry_used reset করো — নতুন ১বার পাবে
+  if (wasOff && turningOn) {
+    const trials = loadTrials();
+    let changed = false;
+    Object.keys(trials.used_pcs || {}).forEach(pc => {
+      if (trials.used_pcs[pc].retry_used) {
+        trials.used_pcs[pc].retry_used = false;
+        changed = true;
+      }
+    });
+    if (changed) saveTrials(trials);
+  }
+  
   return res.json({ success: true, allow_retry_trial: cfg.allow_retry_trial });
 });
 // ==============================
