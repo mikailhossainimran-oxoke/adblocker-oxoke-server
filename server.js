@@ -245,6 +245,10 @@ app.post('/api/check-trial-status', async (req, res) => {
   if (!_trialsMemory) {
     if (GITHUB_TOKEN && GITHUB_REPO) {
       await loadTrialsFromGitHub().catch(() => {});
+      // Load করার পরেও না পেলে — safe fail: block করো
+      if (!_trialsMemory) {
+        return res.json({ used: true, retry_allowed: false, reason: 'data_loading' });
+      }
     }
   }
 
