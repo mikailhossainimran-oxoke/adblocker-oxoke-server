@@ -592,6 +592,26 @@ app.post('/api/admin/set-extension-enabled', async (req, res) => {
   return res.json({ success: true, extension_enabled: cfg.extension_enabled });
 });
 
+
+// ==============================
+// ADMIN: Reset retry_used for all PCs
+// (তাদের আবার ১বার retry সুযোগ দাও)
+// ==============================
+app.post('/api/admin/reset-retry-used', async (req, res) => {
+  const { admin_key } = req.body;
+  if (admin_key !== ADMIN_KEY) return res.status(403).json({ success: false });
+  const trials = loadTrials();
+  let count = 0;
+  Object.keys(trials.used_pcs || {}).forEach(pc => {
+    if (trials.used_pcs[pc].retry_used) {
+      trials.used_pcs[pc].retry_used = false;
+      count++;
+    }
+  });
+  if (count > 0) saveTrials(trials);
+  return res.json({ success: true, reset_count: count, message: count + ' PC এর retry সুযোগ পুনরায় দেওয়া হয়েছে।' });
+});
+
 // ==============================
 // ADMIN: Reset all trials
 // ==============================
@@ -606,7 +626,11 @@ app.post('/api/admin/reset-trials', async (req, res) => {
 // ==============================
 // PUBLIC: Get extension status
 // ==============================
-app.get('/api/status', (req, res) => {
+app.get('/api/status', async (req, res) => {
+  // Config memory না থাকলে GitHub থেকে load করো
+  if (!_configMemory && GITHUB_TOKEN && GITHUB_REPO) {
+    await loadConfigFromGitHub().catch(()=>{});
+  }
   const cfg = loadConfig();
   return res.json({
     extension_enabled: cfg.extension_enabled !== false,
