@@ -3,6 +3,6 @@
   "allow_retry_trial": false,
   "trial_enabled": true,
   "extension_enabled": true,
-  "unlimited_retry": false,
+  "unlimited_retry": true,
   "retry_limit": 0
 }
