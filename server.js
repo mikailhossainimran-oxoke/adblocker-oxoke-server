@@ -260,9 +260,7 @@ app.post('/api/get-trial', async (req, res) => {
       const globalRetryTs = cfg.global_retry_ts || 0;
       const lastTrialExpiry = record.expiry ? new Date(record.expiry).getTime() : 0;
       const canRetryManual = record.manual_retry === true || (globalRetryTs > 0 && lastTrialExpiry < globalRetryTs);
-      // Legacy: allow_retry_trial toggle + retry_used check
-      const canRetryLegacy = (cfg.allow_retry_trial && !record.retry_used);
-      const canRetry = canRetryUnlimited || canRetryLimited || canRetryManual || canRetryLegacy;
+      const canRetry = canRetryUnlimited || canRetryLimited || canRetryManual;
       if (canRetry) {
         // Retry — fresh trial দাও
         const trialDurationMs = cfg.trial_duration_ms || (2 * 60 * 60 * 1000);
@@ -353,7 +351,6 @@ app.post('/api/check-trial-status', async (req, res) => {
   
   // Trial expired — retry check
   // Retry Trial toggle ON + ১বার retry বাকি আছে
-  const retryByToggle = (cfg.allow_retry_trial && !record.retry_used) || false;
   // Unlimited retry ON
   const retryByUnlimited = cfg.unlimited_retry === true;
   // Limited retry — limit এর মধ্যে আছে
@@ -362,7 +359,7 @@ app.post('/api/check-trial-status', async (req, res) => {
   const globalRetryTs = cfg.global_retry_ts || 0;
   const lastTrialExpiry = record.expiry ? new Date(record.expiry).getTime() : 0;
   const retryByManual = record.manual_retry === true || (globalRetryTs > 0 && lastTrialExpiry < globalRetryTs);
-  const retryAllowed = retryByToggle || retryByUnlimited || retryByLimit || retryByManual;
+  const retryAllowed = retryByUnlimited || retryByLimit || retryByManual;
   return res.json({ used: true, active: false, expiry: record.expiry || null, retry_allowed: retryAllowed });
 });
 
