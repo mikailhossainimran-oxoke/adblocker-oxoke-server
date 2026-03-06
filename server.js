@@ -650,13 +650,12 @@ app.post('/api/admin/reset-retry-used', async (req, res) => {
 app.post('/api/admin/set-unlimited-retry', async (req, res) => {
   const { admin_key, enabled } = req.body;
   if (admin_key !== ADMIN_KEY) return res.status(403).json({ success: false });
-  if (!_configMemory) _configMemory = {};
-  _configMemory.unlimited_retry = !!enabled;
-  if (enabled) {
-    // Unlimited ON হলে retry_limit reset করো
-    _configMemory.retry_limit = 0;
-  }
-  await saveConfigToGitHub().catch(() => {});
+  if (!_configMemory && GITHUB_TOKEN && GITHUB_REPO) await loadConfigFromGitHub().catch(()=>{});
+  const cfg = loadConfig();
+  cfg.unlimited_retry = !!enabled;
+  if (enabled) cfg.retry_limit = 0;
+  saveConfig(cfg);
+  await saveConfigToGitHub(cfg).catch(() => {});
   console.log(`[Admin] Unlimited Retry: ${enabled ? 'ON' : 'OFF'}`);
   return res.json({ success: true, unlimited_retry: _configMemory.unlimited_retry });
 });
@@ -669,10 +668,12 @@ app.post('/api/admin/set-retry-limit', async (req, res) => {
   if (admin_key !== ADMIN_KEY) return res.status(403).json({ success: false });
   const n = parseInt(limit, 10);
   if (isNaN(n) || n < 0) return res.json({ success: false, message: 'Invalid limit' });
-  if (!_configMemory) _configMemory = {};
-  _configMemory.retry_limit = n;
-  _configMemory.unlimited_retry = false; // Limit set হলে unlimited OFF
-  await saveConfigToGitHub().catch(() => {});
+  if (!_configMemory && GITHUB_TOKEN && GITHUB_REPO) await loadConfigFromGitHub().catch(()=>{});
+  const cfg = loadConfig();
+  cfg.retry_limit = n;
+  cfg.unlimited_retry = false;
+  saveConfig(cfg);
+  await saveConfigToGitHub(cfg).catch(() => {});
   console.log(`[Admin] Retry Limit set to: ${n}`);
   return res.json({ success: true, retry_limit: n });
 });
