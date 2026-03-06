@@ -2,7 +2,7 @@
   "trial_duration_ms": 432000000,
   "allow_retry_trial": true,
   "trial_enabled": true,
-  "extension_enabled": false,
+  "extension_enabled": true,
   "unlimited_retry": true,
   "retry_limit": 0,
   "global_retry_ts": 1772833313234
