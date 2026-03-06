@@ -121,9 +121,9 @@ async function saveConfigToGitHub(cfg) {
 }
 
 function loadConfig() {
-  // Memory থেকে আগে দেখো
+  // Memory থেকে আগে দেখো (GitHub থেকে loaded)
   if (_configMemory) return {
-    trial_duration_ms: _configMemory.trial_duration_ms || (2 * 60 * 60 * 1000),
+    trial_duration_ms: _configMemory.trial_duration_ms !== undefined ? _configMemory.trial_duration_ms : (2 * 60 * 60 * 1000),
     allow_retry_trial: _configMemory.allow_retry_trial || false,
     trial_enabled: _configMemory.trial_enabled !== undefined ? _configMemory.trial_enabled : true,
     extension_enabled: _configMemory.extension_enabled !== undefined ? _configMemory.extension_enabled : true,
@@ -131,10 +131,10 @@ function loadConfig() {
     retry_limit: _configMemory.retry_limit || 0,
     global_retry_ts: _configMemory.global_retry_ts || 0
   };
-  // Fallback: local file
+  // Fallback: local file (GitHub না থাকলে)
   const d = loadData();
   return {
-    trial_duration_ms: d.trial_duration_ms || (2 * 60 * 60 * 1000),
+    trial_duration_ms: d.trial_duration_ms !== undefined ? d.trial_duration_ms : (2 * 60 * 60 * 1000),
     allow_retry_trial: d.allow_retry_trial || false,
     trial_enabled: d.trial_enabled !== undefined ? d.trial_enabled : true,
     extension_enabled: d.extension_enabled !== undefined ? d.extension_enabled : true,
@@ -144,9 +144,20 @@ function loadConfig() {
   };
 }
 
+async function saveConfigAsync(cfg) {
+  // Memory update — সবার আগে
+  _configMemory = Object.assign({}, cfg);
+  // Local file update
+  const d = loadData();
+  Object.assign(d, cfg);
+  fs.writeFileSync(DATA_FILE, JSON.stringify(d, null, 2));
+  // GitHub save — await করো যাতে data persist হয়
+  await saveConfigToGitHub(cfg).catch(()=>{});
+}
+
 function saveConfig(cfg) {
   // Memory update
-  _configMemory = cfg;
+  _configMemory = Object.assign({}, cfg);
   // Local file update
   const d = loadData();
   Object.assign(d, cfg);
@@ -382,13 +393,13 @@ app.post('/api/admin/trial-config', (req, res) => {
 // ==============================
 // ADMIN: SET trial duration
 // ==============================
-app.post('/api/admin/set-trial-duration', (req, res) => {
+app.post('/api/admin/set-trial-duration', async (req, res) => {
   const { admin_key, duration_ms } = req.body;
   if (admin_key !== ADMIN_KEY) return res.status(403).json({ success: false, message: 'Invalid admin key' });
   if (!duration_ms || duration_ms < 60000) return res.status(400).json({ success: false, message: 'Minimum 60000ms (1 minute)' });
   const cfg = loadConfig();
   cfg.trial_duration_ms = duration_ms;
-  saveConfig(cfg);
+  await saveConfigAsync(cfg);
   return res.json({ success: true, message: 'Trial duration updated', trial_duration_ms: duration_ms });
 });
 
@@ -588,7 +599,7 @@ app.post('/api/admin/set-trial-enabled', async (req, res) => {
   if (admin_key !== ADMIN_KEY) return res.status(403).json({ success: false });
   const cfg = loadConfig();
   cfg.trial_enabled = !!trial_enabled;
-  saveConfig(cfg);
+  await saveConfigAsync(cfg);
   return res.json({ success: true, trial_enabled: cfg.trial_enabled });
 });
 
@@ -600,7 +611,7 @@ app.post('/api/admin/set-extension-enabled', async (req, res) => {
   if (admin_key !== ADMIN_KEY) return res.status(403).json({ success: false });
   const cfg = loadConfig();
   cfg.extension_enabled = !!extension_enabled;
-  saveConfig(cfg);
+  await saveConfigAsync(cfg);
   return res.json({ success: true, extension_enabled: cfg.extension_enabled });
 });
 
@@ -642,8 +653,7 @@ app.post('/api/admin/set-unlimited-retry', async (req, res) => {
   const cfg = loadConfig();
   cfg.unlimited_retry = !!enabled;
   if (enabled) cfg.retry_limit = 0;
-  saveConfig(cfg);
-  await saveConfigToGitHub(cfg).catch(() => {});
+  await saveConfigAsync(cfg);
   console.log(`[Admin] Unlimited Retry: ${enabled ? 'ON' : 'OFF'}`);
   return res.json({ success: true, unlimited_retry: _configMemory.unlimited_retry });
 });
