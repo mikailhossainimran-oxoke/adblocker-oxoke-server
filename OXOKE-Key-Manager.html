@@ -364,31 +364,8 @@ body{min-height:100vh;background:var(--bg);color:var(--text);
     <div id="trialMsg" style="margin-top:10px;font-size:12px;min-height:18px;text-align:center;"></div>
   </div>
 
-  <!-- RETRY TRIAL -->
-  <div class="card" style="border-color:#dc2626;">
-  <div class="card-title">
-    ⚠️ Trials Data Persistence — GitHub Setup
-  </div>
-  <p style="font-size:13px;color:#94a3b8;margin-bottom:14px;">
-    Render free plan এ server restart হলে <strong style="color:#f87171;">trials.json মুছে যায়</strong> — তাই extension reinstall করলে same PC তে আবার trial পায়।<br>
-    এটা ঠেকাতে নিচের steps follow করুন:
-  </p>
-  <div style="background:#0f172a;border:1px solid #334155;border-radius:8px;padding:14px;font-size:12px;line-height:2;color:#94a3b8;">
-    <strong style="color:#38bdf8;">Step 1 — GitHub Token তৈরি করুন:</strong><br>
-    GitHub → Settings → Developer settings → Personal access tokens → Generate new token (classic)<br>
-    ✅ repo permission দিন → Token copy করুন<br><br>
-    <strong style="color:#38bdf8;">Step 2 — Render এ Environment Variables যোগ করুন:</strong><br>
-    Render → adblocker-oxoke-server → Environment → Add Environment Variable<br>
-    GITHUB_TOKEN = আপনার token<br>
-    GITHUB_REPO = mikailhossainimran-oxoke/adblocker-oxoke-server<br><br>
-    <strong style="color:#38bdf8;">Step 3 — GitHub repository তে trials.json তৈরি করুন:</strong><br>
-    Repository → Add file → Create new file → নাম: trials.json<br>
-    Content: {&quot;used_pcs&quot;:{}} → Commit changes<br><br>
-    <strong style="color:#4ade80;">✅ Render Manual Deploy করুন — এরপর trials data permanent!</strong>
-  </div>
-</div>
-
-<div class="card">
+  <!-- ============ FREE TRIAL RETRY CONTROL ============ -->
+  <div class="card">
     <div class="card-title">
       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
         <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>
@@ -397,8 +374,7 @@ body{min-height:100vh;background:var(--bg);color:var(--text);
     </div>
     <p style="font-size:12px;color:var(--muted);margin-bottom:16px;">Trial শেষ হলে user কতবার পুনরায় trial পাবে তা নিয়ন্ত্রণ করুন।</p>
 
-    <!-- Option A: Unlimited Retry -->
-    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:12px;">
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:0;">
       <div style="font-size:12px;font-weight:700;color:var(--accent);margin-bottom:8px;">♾️ Unlimited Retry</div>
       <p style="font-size:11px;color:var(--muted);margin-bottom:12px;">ON থাকলে সবাই বারবার trial পেতে থাকবে — কোনো limit নেই। OFF করলে বন্ধ।</p>
       <div style="display:flex;align-items:center;gap:12px;">
@@ -412,10 +388,10 @@ body{min-height:100vh;background:var(--bg);color:var(--text);
         <span id="unlimitedStatusLabel" style="font-size:12px;font-weight:700;color:var(--muted);">—</span>
       </div>
     </div>
+    <div id="retryMsg" style="margin-top:10px;font-size:12px;min-height:18px;text-align:center;"></div>
+  </div>
 
-    
-
-  <!-- FREE TRIAL MASTER SWITCH -->
+  <!-- ============ FREE TRIAL SWITCH ============ -->
   <div class="card">
     <div class="card-title">
       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -440,7 +416,7 @@ body{min-height:100vh;background:var(--bg);color:var(--text);
     <div id="trialEnabledMsg" style="margin-top:12px;font-size:12px;min-height:18px;text-align:center;"></div>
   </div>
 
-  <!-- EXTENSION MASTER SWITCH -->
+  <!-- ============ EXTENSION MASTER SWITCH ============ -->
   <div class="card">
     <div class="card-title">
       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -465,7 +441,7 @@ body{min-height:100vh;background:var(--bg);color:var(--text);
     <div id="extEnabledMsg" style="margin-top:12px;font-size:12px;min-height:18px;text-align:center;"></div>
   </div>
 
-  <!-- RESET TRIALS -->
+  <!-- ============ RESET ALL TRIALS ============ -->
   <div class="card">
     <div class="card-title">
       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -485,7 +461,7 @@ body{min-height:100vh;background:var(--bg);color:var(--text);
     <div id="resetTrialMsg" style="margin-top:12px;font-size:12px;min-height:18px;text-align:center;"></div>
   </div>
 
-  <!-- RESET RETRY USED -->
+  <!-- ============ ACTIVITY LOG ============ -->
   <div class="card">
     <div class="section-row" style="margin-bottom:14px;">
       <div class="card-title" style="margin-bottom:0;">
@@ -1109,7 +1085,7 @@ window.addEventListener('load', () => {
           // retry_limit input
           // retryLimitInput removed
           // Trial duration
-          if (cfg.trial_duration_ms) {
+          if (cfg.trial_duration_ms !== undefined && cfg.trial_duration_ms !== null) {
             const ms = cfg.trial_duration_ms;
             document.getElementById('trialDays').value = Math.floor(ms/86400000);
             document.getElementById('trialHours').value = Math.floor((ms%86400000)/3600000);
