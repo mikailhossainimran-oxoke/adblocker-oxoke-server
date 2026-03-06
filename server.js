@@ -128,7 +128,8 @@ function loadConfig() {
     trial_enabled: _configMemory.trial_enabled !== undefined ? _configMemory.trial_enabled : true,
     extension_enabled: _configMemory.extension_enabled !== undefined ? _configMemory.extension_enabled : true,
     unlimited_retry: _configMemory.unlimited_retry || false,
-    retry_limit: _configMemory.retry_limit || 0
+    retry_limit: _configMemory.retry_limit || 0,
+    global_retry_ts: _configMemory.global_retry_ts || 0
   };
   // Fallback: local file
   const d = loadData();
@@ -138,7 +139,8 @@ function loadConfig() {
     trial_enabled: d.trial_enabled !== undefined ? d.trial_enabled : true,
     extension_enabled: d.extension_enabled !== undefined ? d.extension_enabled : true,
     unlimited_retry: d.unlimited_retry || false,
-    retry_limit: d.retry_limit || 0
+    retry_limit: d.retry_limit || 0,
+    global_retry_ts: d.global_retry_ts || 0
   };
 }
 
@@ -255,7 +257,9 @@ app.post('/api/get-trial', async (req, res) => {
       // Limited retry — limit এর মধ্যে আছে
       const canRetryLimited = (cfg.retry_limit > 0) && (retryCount < cfg.retry_limit);
       // Manual retry (Give Retry Chance Again button)
-      const canRetryManual = record.manual_retry === true;
+      const globalRetryTs = cfg.global_retry_ts || 0;
+      const lastTrialExpiry = record.expiry ? new Date(record.expiry).getTime() : 0;
+      const canRetryManual = record.manual_retry === true || (globalRetryTs > 0 && lastTrialExpiry < globalRetryTs);
       // Legacy: allow_retry_trial toggle + retry_used check
       const canRetryLegacy = (cfg.allow_retry_trial && !record.retry_used);
       const canRetry = canRetryUnlimited || canRetryLimited || canRetryManual || canRetryLegacy;
@@ -307,6 +311,11 @@ app.post('/api/check-trial-status', async (req, res) => {
   const { pc_fingerprint } = req.body;
   if (!pc_fingerprint) return res.json({ used: false });
   
+  // Config memory না থাকলে GitHub থেকে load করো
+  if (!_configMemory && GITHUB_TOKEN && GITHUB_REPO) {
+    await loadConfigFromGitHub().catch(() => {});
+  }
+
   // Extension/trial enabled check
   const statusCfg = loadConfig();
   if (!statusCfg.extension_enabled) {
@@ -350,7 +359,9 @@ app.post('/api/check-trial-status', async (req, res) => {
   // Limited retry — limit এর মধ্যে আছে
   const retryByLimit = (cfg.retry_limit > 0) && ((record.retry_count || 0) < cfg.retry_limit);
   // Give Retry Chance Again বাটনে manually দেওয়া হয়েছে
-  const retryByManual = record.manual_retry === true;
+  const globalRetryTs = cfg.global_retry_ts || 0;
+  const lastTrialExpiry = record.expiry ? new Date(record.expiry).getTime() : 0;
+  const retryByManual = record.manual_retry === true || (globalRetryTs > 0 && lastTrialExpiry < globalRetryTs);
   const retryAllowed = retryByToggle || retryByUnlimited || retryByLimit || retryByManual;
   return res.json({ used: true, active: false, expiry: record.expiry || null, retry_allowed: retryAllowed });
 });
@@ -628,20 +639,14 @@ app.post('/api/admin/set-extension-enabled', async (req, res) => {
 app.post('/api/admin/reset-retry-used', async (req, res) => {
   const { admin_key } = req.body;
   if (admin_key !== ADMIN_KEY) return res.status(403).json({ success: false });
-  const trials = loadTrials();
-  let count = 0;
-  Object.keys(trials.used_pcs || {}).forEach(pc => {
-    const record = trials.used_pcs[pc];
-    // retry_used হয়েছে বা expired — manual_retry সুযোগ দাও
-    const isExpired = record.expiry && Date.now() > new Date(record.expiry).getTime();
-    if (isExpired) {
-      trials.used_pcs[pc].manual_retry = true;
-      trials.used_pcs[pc].retry_used = false;
-      count++;
-    }
-  });
-  if (count > 0) await saveTrials(trials);
-  return res.json({ success: true, reset_count: count, message: count + ' PC এর retry সুযোগ পুনরায় দেওয়া হয়েছে।' });
+  // Config এ global_retry_ts save করো — trials.json update দরকার নেই
+  if (!_configMemory && GITHUB_TOKEN && GITHUB_REPO) await loadConfigFromGitHub().catch(()=>{});
+  const cfg = loadConfig();
+  cfg.global_retry_ts = Date.now(); // এই timestamp এর আগে শেষ trial যারা করেছে তারা retry পাবে
+  saveConfig(cfg);
+  await saveConfigToGitHub(cfg).catch(() => {});
+  console.log(`[Admin] Give Retry Chance Again — ts: ${cfg.global_retry_ts}`);
+  return res.json({ success: true, reset_count: 'all', message: 'সকল expired PC কে retry সুযোগ দেওয়া হয়েছে।' });
 });
 
 // ==============================
