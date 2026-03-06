@@ -92,12 +92,12 @@ function loadTrials() {
   _trialsMemory = { used_pcs: {} };
   return _trialsMemory;
 }
-function saveTrials(data) {
+async function saveTrials(data) {
   _trialsMemory = data;
   // Save locally as backup
   try { fs.writeFileSync(TRIAL_FILE, JSON.stringify(data, null, 2)); } catch(e) {}
-  // Save to GitHub (async, don't wait)
-  saveTrialsToGitHub(data).catch(()=>{});
+  // Save to GitHub (await করো যাতে data persist হয়)
+  await saveTrialsToGitHub(data).catch(()=>{});
 }
 
 async function loadConfigFromGitHub() {
@@ -136,7 +136,9 @@ function loadConfig() {
     trial_duration_ms: d.trial_duration_ms || (2 * 60 * 60 * 1000),
     allow_retry_trial: d.allow_retry_trial || false,
     trial_enabled: d.trial_enabled !== undefined ? d.trial_enabled : true,
-    extension_enabled: d.extension_enabled !== undefined ? d.extension_enabled : true
+    extension_enabled: d.extension_enabled !== undefined ? d.extension_enabled : true,
+    unlimited_retry: d.unlimited_retry || false,
+    retry_limit: d.retry_limit || 0
   };
 }
 
@@ -217,6 +219,10 @@ app.post('/api/get-trial', async (req, res) => {
   }
 
   // Trial enabled check
+  // Config memory না থাকলে GitHub থেকে load করো
+  if (!_configMemory && GITHUB_TOKEN && GITHUB_REPO) {
+    await loadConfigFromGitHub().catch(() => {});
+  }
   const cfgCheck = loadConfig();
   if (!cfgCheck.extension_enabled) {
     return res.status(403).json({ success: false, message: 'Extension under maintenance.', maintenance: true });
@@ -261,7 +267,7 @@ app.post('/api/get-trial', async (req, res) => {
         const newRetryCount = (record.retry_count || 0) + 1;
         // retry consume করো
         trials.used_pcs[hashedPc] = { key: newKey, expiry: newExpiry, created: new Date().toISOString(), retried: true, retry_used: true, manual_retry: false, retry_count: newRetryCount };
-        saveTrials(trials);
+        await saveTrials(trials);
         return res.json({ success: true, key: newKey, expiry: newExpiry, type: 'trial', duration_ms: trialDurationMs, message: 'Trial restarted.' });
       }
       return res.status(403).json({
@@ -282,7 +288,7 @@ app.post('/api/get-trial', async (req, res) => {
     expiry: expiry,
     created: new Date().toISOString()
   };
-  saveTrials(trials);
+  await saveTrials(trials);
 
   return res.json({
     success: true,
@@ -391,7 +397,7 @@ app.post('/api/admin/get-retry-trial', (req, res) => {
 // ==============================
 // ADMIN: SET retry trial on/off
 // ==============================
-app.post('/api/admin/set-retry-trial', (req, res) => {
+app.post('/api/admin/set-retry-trial', async (req, res) => {
   const { admin_key, allow_retry_trial } = req.body;
   if (admin_key !== ADMIN_KEY) return res.status(403).json({ success: false, message: 'Invalid admin key' });
   const cfg = loadConfig();
@@ -410,7 +416,7 @@ app.post('/api/admin/set-retry-trial', (req, res) => {
         changed = true;
       }
     });
-    if (changed) saveTrials(trials);
+    if (changed) await saveTrials(trials);
   }
   
   return res.json({ success: true, allow_retry_trial: cfg.allow_retry_trial });
@@ -634,7 +640,7 @@ app.post('/api/admin/reset-retry-used', async (req, res) => {
       count++;
     }
   });
-  if (count > 0) saveTrials(trials);
+  if (count > 0) await saveTrials(trials);
   return res.json({ success: true, reset_count: count, message: count + ' PC এর retry সুযোগ পুনরায় দেওয়া হয়েছে।' });
 });
 
