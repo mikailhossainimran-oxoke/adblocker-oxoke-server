@@ -408,30 +408,6 @@ app.post('/api/admin/get-retry-trial', (req, res) => {
 // ==============================
 // ADMIN: SET retry trial on/off
 // ==============================
-app.post('/api/admin/set-retry-trial', async (req, res) => {
-  const { admin_key, allow_retry_trial } = req.body;
-  if (admin_key !== ADMIN_KEY) return res.status(403).json({ success: false, message: 'Invalid admin key' });
-  const cfg = loadConfig();
-  const wasOff = !cfg.allow_retry_trial;
-  const turningOn = !!allow_retry_trial;
-  cfg.allow_retry_trial = turningOn;
-  saveConfig(cfg);
-  
-  // OFF → ON করলে সব PC এর retry_used reset করো — নতুন ১বার পাবে
-  if (wasOff && turningOn) {
-    const trials = loadTrials();
-    let changed = false;
-    Object.keys(trials.used_pcs || {}).forEach(pc => {
-      if (trials.used_pcs[pc].retry_used) {
-        trials.used_pcs[pc].retry_used = false;
-        changed = true;
-      }
-    });
-    if (changed) await saveTrials(trials);
-  }
-  
-  return res.json({ success: true, allow_retry_trial: cfg.allow_retry_trial });
-});
 // ==============================
 app.post('/api/activate', (req, res) => {
   const { code, pc_fingerprint } = req.body;
@@ -636,17 +612,27 @@ app.post('/api/admin/set-extension-enabled', async (req, res) => {
 // ADMIN: Reset retry_used for all PCs
 // (তাদের আবার ১বার retry সুযোগ দাও)
 // ==============================
-app.post('/api/admin/reset-retry-used', async (req, res) => {
+
+// ==============================
+// ADMIN: Reset Trial History for Expired PCs only
+// ==============================
+app.post('/api/admin/reset-expired-trials', async (req, res) => {
   const { admin_key } = req.body;
   if (admin_key !== ADMIN_KEY) return res.status(403).json({ success: false });
-  // Config এ global_retry_ts save করো — trials.json update দরকার নেই
-  if (!_configMemory && GITHUB_TOKEN && GITHUB_REPO) await loadConfigFromGitHub().catch(()=>{});
-  const cfg = loadConfig();
-  cfg.global_retry_ts = Date.now(); // এই timestamp এর আগে শেষ trial যারা করেছে তারা retry পাবে
-  saveConfig(cfg);
-  await saveConfigToGitHub(cfg).catch(() => {});
-  console.log(`[Admin] Give Retry Chance Again — ts: ${cfg.global_retry_ts}`);
-  return res.json({ success: true, reset_count: 'all', message: 'সকল expired PC কে retry সুযোগ দেওয়া হয়েছে।' });
+  if (!_trialsMemory && GITHUB_TOKEN && GITHUB_REPO) await loadTrialsFromGitHub().catch(()=>{});
+  const trials = loadTrials();
+  let count = 0;
+  Object.keys(trials.used_pcs || {}).forEach(pc => {
+    const record = trials.used_pcs[pc];
+    const isExpired = record.expiry && Date.now() > new Date(record.expiry).getTime();
+    if (isExpired) {
+      delete trials.used_pcs[pc];
+      count++;
+    }
+  });
+  if (count > 0) await saveTrials(trials);
+  console.log(`[Admin] Reset expired trials: ${count} PCs removed`);
+  return res.json({ success: true, reset_count: count, message: `${count} টি expired PC এর trial history মুছে ফেলা হয়েছে।` });
 });
 
 // ==============================
@@ -668,20 +654,6 @@ app.post('/api/admin/set-unlimited-retry', async (req, res) => {
 // ==============================
 // ADMIN: Set Retry Limit (কতবার)
 // ==============================
-app.post('/api/admin/set-retry-limit', async (req, res) => {
-  const { admin_key, limit } = req.body;
-  if (admin_key !== ADMIN_KEY) return res.status(403).json({ success: false });
-  const n = parseInt(limit, 10);
-  if (isNaN(n) || n < 0) return res.json({ success: false, message: 'Invalid limit' });
-  if (!_configMemory && GITHUB_TOKEN && GITHUB_REPO) await loadConfigFromGitHub().catch(()=>{});
-  const cfg = loadConfig();
-  cfg.retry_limit = n;
-  cfg.unlimited_retry = false;
-  saveConfig(cfg);
-  await saveConfigToGitHub(cfg).catch(() => {});
-  console.log(`[Admin] Retry Limit set to: ${n}`);
-  return res.json({ success: true, retry_limit: n });
-});
 
 // ==============================
 // ADMIN: Reset all trials
