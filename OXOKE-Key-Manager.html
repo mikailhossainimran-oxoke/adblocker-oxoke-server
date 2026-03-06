@@ -888,7 +888,7 @@ function setTrialPreset(days, hours, minutes) {
   document.getElementById('trialMinutes').value = minutes;
 }
 
-async function loadRetryStatus(manual=false) {
+async function loadRetryStatus(manual=false) { return; // Legacy removed
     const url = document.getElementById('serverUrl').value.trim();
     const key = document.getElementById('adminKey').value.trim();
     const msg = document.getElementById('retryMsg');
@@ -904,7 +904,7 @@ async function loadRetryStatus(manual=false) {
     }
   }
 
-  async function setRetryTrial(enabled) {
+  async function setRetryTrial(enabled) { return; // Legacy removed
     const url = document.getElementById('serverUrl').value.trim();
     const key = document.getElementById('adminKey').value.trim();
     const msg = document.getElementById('retryMsg');
@@ -921,11 +921,8 @@ async function loadRetryStatus(manual=false) {
   }
 
   function applyRetryUI(isOn) {
-    const tog    = document.getElementById('retryTrialToggle');
-    const slider = document.getElementById('retrySlider');
-    const knob   = document.getElementById('retryKnob');
-    const label  = document.getElementById('retryStatusLabel');
-    if(!tog) return;
+    // Legacy toggle removed — no-op
+    return;
     tog.checked = isOn;
     if (isOn) {
       slider.style.background='var(--green)'; slider.style.borderColor='var(--green)';
@@ -974,7 +971,7 @@ async function loadRetryStatus(manual=false) {
     } catch(e) { if(msg){msg.textContent='❌ Error: '+e.message;msg.style.color='var(--red)';} }
   }
 
-  async function setRetryLimit() {
+  async function setRetryLimit() { return; // Legacy removed
     const url = document.getElementById('serverUrl').value.trim();
     const key = document.getElementById('adminKey').value.trim();
     const inp = document.getElementById('retryLimitInput');
@@ -1110,8 +1107,7 @@ window.addEventListener('load', () => {
           applyRetryUI(cfg.allow_retry_trial||false);
           applyUnlimitedUI(cfg.unlimited_retry||false);
           // retry_limit input
-          const inp=document.getElementById('retryLimitInput');
-          if(inp && cfg.retry_limit!==undefined) inp.value = cfg.retry_limit || 0;
+          // retryLimitInput removed
           // Trial duration
           if (cfg.trial_duration_ms) {
             const ms = cfg.trial_duration_ms;
