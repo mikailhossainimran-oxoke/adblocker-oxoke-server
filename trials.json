@@ -1,3 +1,9 @@
 {
-  "used_pcs": {}
+  "used_pcs": {
+    "e5228222c2cfc7cf": {
+      "key": "TRIAL-JF0GO-BKH4K",
+      "expiry": "2026-03-11T21:46:32.195Z",
+      "created": "2026-03-06T21:46:32.195Z"
+    }
+  }
 }
