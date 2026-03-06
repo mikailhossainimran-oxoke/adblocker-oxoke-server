@@ -1,3 +1,9 @@
 {
-  "used_pcs": {}
+  "used_pcs": {
+    "24e8ec46e95628bd": {
+      "key": "TRIAL-1EQ8G-YIXZ1",
+      "expiry": "2026-03-10T18:50:36.310Z",
+      "created": "2026-03-06T18:50:36.311Z"
+    }
+  }
 }
