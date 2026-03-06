@@ -395,12 +395,49 @@ body{min-height:100vh;background:var(--bg);color:var(--text);
       </svg>
       Free Trial Retry Control
     </div>
-    <p style="font-size:12px;color:var(--muted);margin-bottom:16px;">এই অপশন <b>ON</b> করলে যাদের free trial শেষ হয়ে গেছে তারা আবার নতুন করে free trial পাবে। <b>OFF</b> করলে আবার বন্ধ হয়ে যাবে।</p>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:16px;">Trial শেষ হলে user কতবার পুনরায় trial পাবে তা নিয়ন্ত্রণ করুন।</p>
 
-    <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
-      <!-- Toggle Switch -->
+    <!-- Option A: Unlimited Retry -->
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:12px;">
+      <div style="font-size:12px;font-weight:700;color:var(--accent);margin-bottom:8px;">♾️ Unlimited Retry</div>
+      <p style="font-size:11px;color:var(--muted);margin-bottom:12px;">ON থাকলে সবাই বারবার trial পেতে থাকবে — কোনো limit নেই। OFF করলে বন্ধ।</p>
       <div style="display:flex;align-items:center;gap:12px;">
-        <span style="font-size:13px;color:var(--muted);">Retry Trial:</span>
+        <span style="font-size:12px;color:var(--muted);">Unlimited:</span>
+        <label style="position:relative;display:inline-block;width:52px;height:28px;cursor:pointer;">
+          <input type="checkbox" id="unlimitedRetryToggle" style="opacity:0;width:0;height:0;" onchange="setUnlimitedRetry(this.checked)">
+          <span id="unlimitedSlider" style="position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:#333;border-radius:28px;transition:.3s;border:1.5px solid var(--border);">
+            <span id="unlimitedKnob" style="position:absolute;height:20px;width:20px;left:3px;bottom:3px;background:var(--muted);border-radius:50%;transition:.3s;"></span>
+          </span>
+        </label>
+        <span id="unlimitedStatusLabel" style="font-size:12px;font-weight:700;color:var(--muted);">—</span>
+      </div>
+    </div>
+
+    <!-- Option B: Limited Retry -->
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:12px;">
+      <div style="font-size:12px;font-weight:700;color:var(--yellow);margin-bottom:8px;">🔢 Limited Retry</div>
+      <p style="font-size:11px;color:var(--muted);margin-bottom:12px;">কতবার trial পাবে সেটা নির্ধারণ করুন। Limit শেষ হলে trial আর পাবে না।</p>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <span style="font-size:12px;color:var(--muted);">Limit:</span>
+        <select id="retryLimitSelect" style="background:var(--surface);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-size:12px;cursor:pointer;">
+          <option value="0">OFF (কোনো limit নেই)</option>
+          <option value="1">১ বার</option>
+          <option value="2">২ বার</option>
+          <option value="3">৩ বার</option>
+          <option value="5">৫ বার</option>
+          <option value="10">১০ বার</option>
+        </select>
+        <button onclick="setRetryLimit()" style="background:var(--accent2);color:#fff;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:12px;">✅ Save</button>
+      </div>
+      <div id="retryLimitMsg" style="margin-top:8px;font-size:11px;min-height:16px;"></div>
+    </div>
+
+    <!-- Legacy: 1-time retry toggle (পুরনো) -->
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px;">
+      <div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:8px;">🔁 One-Time Retry (Legacy)</div>
+      <p style="font-size:11px;color:var(--muted);margin-bottom:12px;">ON থাকলে প্রত্যেক user মাত্র ১বার retry পাবে (পুরনো toggle)।</p>
+      <div style="display:flex;align-items:center;gap:12px;">
+        <span style="font-size:12px;color:var(--muted);">Retry Trial:</span>
         <label style="position:relative;display:inline-block;width:52px;height:28px;cursor:pointer;">
           <input type="checkbox" id="retryTrialToggle" style="opacity:0;width:0;height:0;" onchange="setRetryTrial(this.checked)">
           <span id="retrySlider" style="position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:#333;border-radius:28px;transition:.3s;border:1.5px solid var(--border);">
@@ -409,8 +446,6 @@ body{min-height:100vh;background:var(--bg);color:var(--text);
         </label>
         <span id="retryStatusLabel" style="font-size:13px;font-weight:700;color:var(--muted);">—</span>
       </div>
-
-      <button class="btn btn-outline" onclick="loadRetryStatus(true)" style="font-size:11px;padding:6px 14px;">🔄 Refresh</button>
     </div>
 
     <div id="retryMsg" style="margin-top:12px;font-size:12px;min-height:18px;text-align:center;"></div>
@@ -952,6 +987,62 @@ async function loadRetryStatus(manual=false) {
     }
   }
 
+  function applyUnlimitedUI(isOn) {
+    const tog    = document.getElementById('unlimitedRetryToggle');
+    const slider = document.getElementById('unlimitedSlider');
+    const knob   = document.getElementById('unlimitedKnob');
+    const label  = document.getElementById('unlimitedStatusLabel');
+    if(!tog) return;
+    tog.checked = isOn;
+    if (isOn) {
+      slider.style.background='var(--accent)'; slider.style.borderColor='var(--accent)';
+      knob.style.background='#fff'; knob.style.transform='translateX(24px)';
+      label.textContent='ON ♾️'; label.style.color='var(--accent)';
+    } else {
+      slider.style.background='#333'; slider.style.borderColor='var(--border)';
+      knob.style.background='var(--muted)'; knob.style.transform='translateX(0)';
+      label.textContent='OFF'; label.style.color='var(--muted)';
+    }
+  }
+
+  async function setUnlimitedRetry(enabled) {
+    const url = document.getElementById('serverUrl').value.trim();
+    const key = document.getElementById('adminKey').value.trim();
+    const msg = document.getElementById('retryMsg');
+    try {
+      const r = await fetch(url+'/api/admin/set-unlimited-retry',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({admin_key:key,enabled})});
+      const d = await r.json();
+      if(d.success) {
+        applyUnlimitedUI(enabled);
+        if(enabled) {
+          // Unlimited ON হলে Limited reset করো
+          const sel=document.getElementById('retryLimitSelect'); if(sel) sel.value='0';
+        }
+        if(msg){msg.textContent=enabled?'✅ Unlimited Retry ON — সবাই বারবার trial পাবে':'✅ Unlimited Retry OFF';msg.style.color=enabled?'var(--green)':'var(--muted)';}
+      }
+    } catch(e) { if(msg){msg.textContent='❌ Error: '+e.message;msg.style.color='var(--red)';} }
+  }
+
+  async function setRetryLimit() {
+    const url = document.getElementById('serverUrl').value.trim();
+    const key = document.getElementById('adminKey').value.trim();
+    const sel = document.getElementById('retryLimitSelect');
+    const msg = document.getElementById('retryLimitMsg');
+    const limit = parseInt(sel.value,10);
+    try {
+      const r = await fetch(url+'/api/admin/set-retry-limit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({admin_key:key,limit})});
+      const d = await r.json();
+      if(d.success) {
+        if(limit>0) {
+          applyUnlimitedUI(false); // Limited ON হলে Unlimited OFF
+          if(msg){msg.textContent='✅ Limit set: '+limit+' বার — এর বেশি trial পাবে না';msg.style.color='var(--yellow)';}
+        } else {
+          if(msg){msg.textContent='✅ Limit OFF করা হয়েছে';msg.style.color='var(--muted)';}
+        }
+      }
+    } catch(e) { if(msg){msg.textContent='❌ Error: '+e.message;msg.style.color='var(--red)';} }
+  }
+
   // Retry status loads automatically after server TEST button connects
 
   async function loadTrialDuration() {
@@ -1062,6 +1153,14 @@ window.addEventListener('load', () => {
           applyToggleUI('trialEnabledToggle','trialEnabledSlider','trialEnabledKnob','trialEnabledLabel', cfg.trial_enabled!==false, 'ON','OFF','#22c55e','#f87171');
           applyToggleUI('extEnabledToggle','extEnabledSlider','extEnabledKnob','extEnabledLabel', cfg.extension_enabled!==false, 'ON','OFF','#22c55e','#f87171');
           applyRetryUI(cfg.allow_retry_trial||false);
+          applyUnlimitedUI(cfg.unlimited_retry||false);
+          // retry_limit select
+          const sel=document.getElementById('retryLimitSelect');
+          if(sel && cfg.retry_limit!==undefined){
+            const v=String(cfg.retry_limit);
+            if([...sel.options].some(o=>o.value===v)) sel.value=v;
+            else sel.value='0';
+          }
           // Trial duration
           if (cfg.trial_duration_ms) {
             const ms = cfg.trial_duration_ms;
