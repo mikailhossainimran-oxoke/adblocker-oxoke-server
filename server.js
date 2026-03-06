@@ -126,7 +126,9 @@ function loadConfig() {
     trial_duration_ms: _configMemory.trial_duration_ms || (2 * 60 * 60 * 1000),
     allow_retry_trial: _configMemory.allow_retry_trial || false,
     trial_enabled: _configMemory.trial_enabled !== undefined ? _configMemory.trial_enabled : true,
-    extension_enabled: _configMemory.extension_enabled !== undefined ? _configMemory.extension_enabled : true
+    extension_enabled: _configMemory.extension_enabled !== undefined ? _configMemory.extension_enabled : true,
+    unlimited_retry: _configMemory.unlimited_retry || false,
+    retry_limit: _configMemory.retry_limit || 0
   };
   // Fallback: local file
   const d = loadData();
@@ -240,14 +242,25 @@ app.post('/api/get-trial', async (req, res) => {
       });
     } else {
       // Trial শেষ হয়ে গেছে — retry allowed?
-      const canRetry = (cfg.allow_retry_trial && !trials.used_pcs[hashedPc].retry_used) || trials.used_pcs[hashedPc].manual_retry === true;
+      const record = trials.used_pcs[hashedPc];
+      const retryCount = record.retry_count || 0;
+      // Unlimited retry ON — সবসময় দাও
+      const canRetryUnlimited = cfg.unlimited_retry === true;
+      // Limited retry — limit এর মধ্যে আছে
+      const canRetryLimited = (cfg.retry_limit > 0) && (retryCount < cfg.retry_limit);
+      // Manual retry (Give Retry Chance Again button)
+      const canRetryManual = record.manual_retry === true;
+      // Legacy: allow_retry_trial toggle + retry_used check
+      const canRetryLegacy = (cfg.allow_retry_trial && !record.retry_used);
+      const canRetry = canRetryUnlimited || canRetryLimited || canRetryManual || canRetryLegacy;
       if (canRetry) {
-        // Retry — ১বারের জন্য fresh trial দাও
+        // Retry — fresh trial দাও
         const trialDurationMs = cfg.trial_duration_ms || (2 * 60 * 60 * 1000);
         const newExpiry = new Date(Date.now() + trialDurationMs).toISOString();
         const newKey = generateTrialKey();
+        const newRetryCount = (record.retry_count || 0) + 1;
         // retry consume করো
-        trials.used_pcs[hashedPc] = { key: newKey, expiry: newExpiry, created: new Date().toISOString(), retried: true, retry_used: true, manual_retry: false };
+        trials.used_pcs[hashedPc] = { key: newKey, expiry: newExpiry, created: new Date().toISOString(), retried: true, retry_used: true, manual_retry: false, retry_count: newRetryCount };
         saveTrials(trials);
         return res.json({ success: true, key: newKey, expiry: newExpiry, type: 'trial', duration_ms: trialDurationMs, message: 'Trial restarted.' });
       }
@@ -326,9 +339,13 @@ app.post('/api/check-trial-status', async (req, res) => {
   // Trial expired — retry check
   // Retry Trial toggle ON + ১বার retry বাকি আছে
   const retryByToggle = (cfg.allow_retry_trial && !record.retry_used) || false;
+  // Unlimited retry ON
+  const retryByUnlimited = cfg.unlimited_retry === true;
+  // Limited retry — limit এর মধ্যে আছে
+  const retryByLimit = (cfg.retry_limit > 0) && ((record.retry_count || 0) < cfg.retry_limit);
   // Give Retry Chance Again বাটনে manually দেওয়া হয়েছে
   const retryByManual = record.manual_retry === true;
-  const retryAllowed = retryByToggle || retryByManual;
+  const retryAllowed = retryByToggle || retryByUnlimited || retryByLimit || retryByManual;
   return res.json({ used: true, active: false, expiry: record.expiry || null, retry_allowed: retryAllowed });
 });
 
@@ -619,6 +636,39 @@ app.post('/api/admin/reset-retry-used', async (req, res) => {
   });
   if (count > 0) saveTrials(trials);
   return res.json({ success: true, reset_count: count, message: count + ' PC এর retry সুযোগ পুনরায় দেওয়া হয়েছে।' });
+});
+
+// ==============================
+// ADMIN: Set Unlimited Retry (ON/OFF)
+// ==============================
+app.post('/api/admin/set-unlimited-retry', async (req, res) => {
+  const { admin_key, enabled } = req.body;
+  if (admin_key !== ADMIN_KEY) return res.status(403).json({ success: false });
+  if (!_configMemory) _configMemory = {};
+  _configMemory.unlimited_retry = !!enabled;
+  if (enabled) {
+    // Unlimited ON হলে retry_limit reset করো
+    _configMemory.retry_limit = 0;
+  }
+  await saveConfigToGitHub().catch(() => {});
+  console.log(`[Admin] Unlimited Retry: ${enabled ? 'ON' : 'OFF'}`);
+  return res.json({ success: true, unlimited_retry: _configMemory.unlimited_retry });
+});
+
+// ==============================
+// ADMIN: Set Retry Limit (কতবার)
+// ==============================
+app.post('/api/admin/set-retry-limit', async (req, res) => {
+  const { admin_key, limit } = req.body;
+  if (admin_key !== ADMIN_KEY) return res.status(403).json({ success: false });
+  const n = parseInt(limit, 10);
+  if (isNaN(n) || n < 0) return res.json({ success: false, message: 'Invalid limit' });
+  if (!_configMemory) _configMemory = {};
+  _configMemory.retry_limit = n;
+  _configMemory.unlimited_retry = false; // Limit set হলে unlimited OFF
+  await saveConfigToGitHub().catch(() => {});
+  console.log(`[Admin] Retry Limit set to: ${n}`);
+  return res.json({ success: true, retry_limit: n });
 });
 
 // ==============================
