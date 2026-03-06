@@ -419,14 +419,7 @@ body{min-height:100vh;background:var(--bg);color:var(--text);
       <p style="font-size:11px;color:var(--muted);margin-bottom:12px;">কতবার trial পাবে সেটা নির্ধারণ করুন। Limit শেষ হলে trial আর পাবে না।</p>
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
         <span style="font-size:12px;color:var(--muted);">Limit:</span>
-        <select id="retryLimitSelect" style="background:var(--surface);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-size:12px;cursor:pointer;">
-          <option value="0">OFF (কোনো limit নেই)</option>
-          <option value="1">১ বার</option>
-          <option value="2">২ বার</option>
-          <option value="3">৩ বার</option>
-          <option value="5">৫ বার</option>
-          <option value="10">১০ বার</option>
-        </select>
+        <input type="number" id="retryLimitInput" min="0" placeholder="যত বার (0 = OFF)" style="background:var(--surface);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-size:12px;width:160px;" />
         <button onclick="setRetryLimit()" style="background:var(--accent2);color:#fff;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:12px;">✅ Save</button>
       </div>
       <div id="retryLimitMsg" style="margin-top:8px;font-size:11px;min-height:16px;"></div>
@@ -1026,15 +1019,19 @@ async function loadRetryStatus(manual=false) {
   async function setRetryLimit() {
     const url = document.getElementById('serverUrl').value.trim();
     const key = document.getElementById('adminKey').value.trim();
-    const sel = document.getElementById('retryLimitSelect');
+    const inp = document.getElementById('retryLimitInput');
     const msg = document.getElementById('retryLimitMsg');
-    const limit = parseInt(sel.value,10);
+    const limit = parseInt(inp.value, 10);
+    if (isNaN(limit) || limit < 0) {
+      if(msg){msg.textContent='❌ সঠিক সংখ্যা দিন (0 বা তার বেশি)';msg.style.color='var(--red)';}
+      return;
+    }
     try {
       const r = await fetch(url+'/api/admin/set-retry-limit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({admin_key:key,limit})});
       const d = await r.json();
       if(d.success) {
         if(limit>0) {
-          applyUnlimitedUI(false); // Limited ON হলে Unlimited OFF
+          applyUnlimitedUI(false);
           if(msg){msg.textContent='✅ Limit set: '+limit+' বার — এর বেশি trial পাবে না';msg.style.color='var(--yellow)';}
         } else {
           if(msg){msg.textContent='✅ Limit OFF করা হয়েছে';msg.style.color='var(--muted)';}
@@ -1154,13 +1151,9 @@ window.addEventListener('load', () => {
           applyToggleUI('extEnabledToggle','extEnabledSlider','extEnabledKnob','extEnabledLabel', cfg.extension_enabled!==false, 'ON','OFF','#22c55e','#f87171');
           applyRetryUI(cfg.allow_retry_trial||false);
           applyUnlimitedUI(cfg.unlimited_retry||false);
-          // retry_limit select
-          const sel=document.getElementById('retryLimitSelect');
-          if(sel && cfg.retry_limit!==undefined){
-            const v=String(cfg.retry_limit);
-            if([...sel.options].some(o=>o.value===v)) sel.value=v;
-            else sel.value='0';
-          }
+          // retry_limit input
+          const inp=document.getElementById('retryLimitInput');
+          if(inp && cfg.retry_limit!==undefined) inp.value = cfg.retry_limit || 0;
           // Trial duration
           if (cfg.trial_duration_ms) {
             const ms = cfg.trial_duration_ms;
