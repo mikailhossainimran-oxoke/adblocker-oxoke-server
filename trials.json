@@ -10,8 +10,8 @@
       "expiry": "2026-03-06T17:01:15.705Z",
       "created": "2026-03-06T17:00:15.705Z",
       "retried": true,
-      "retry_used": true,
-      "manual_retry": false
+      "retry_used": false,
+      "manual_retry": true
     },
     "308dd20a92a2ace0": {
       "key": "TRIAL-E1RPL-4T8FG",
