@@ -413,36 +413,7 @@ body{min-height:100vh;background:var(--bg);color:var(--text);
       </div>
     </div>
 
-    <!-- Option B: Limited Retry -->
-    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:12px;">
-      <div style="font-size:12px;font-weight:700;color:var(--yellow);margin-bottom:8px;">🔢 Limited Retry</div>
-      <p style="font-size:11px;color:var(--muted);margin-bottom:12px;">কতবার trial পাবে সেটা নির্ধারণ করুন। Limit শেষ হলে trial আর পাবে না।</p>
-      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-        <span style="font-size:12px;color:var(--muted);">Limit:</span>
-        <input type="number" id="retryLimitInput" min="0" placeholder="যত বার (0 = OFF)" style="background:var(--surface);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-size:12px;width:160px;" />
-        <button onclick="setRetryLimit()" style="background:var(--accent2);color:#fff;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:12px;">✅ Save</button>
-      </div>
-      <div id="retryLimitMsg" style="margin-top:8px;font-size:11px;min-height:16px;"></div>
-    </div>
-
-    <!-- Legacy: 1-time retry toggle (পুরনো) -->
-    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px;">
-      <div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:8px;">🔁 One-Time Retry (Legacy)</div>
-      <p style="font-size:11px;color:var(--muted);margin-bottom:12px;">ON থাকলে প্রত্যেক user মাত্র ১বার retry পাবে (পুরনো toggle)।</p>
-      <div style="display:flex;align-items:center;gap:12px;">
-        <span style="font-size:12px;color:var(--muted);">Retry Trial:</span>
-        <label style="position:relative;display:inline-block;width:52px;height:28px;cursor:pointer;">
-          <input type="checkbox" id="retryTrialToggle" style="opacity:0;width:0;height:0;" onchange="setRetryTrial(this.checked)">
-          <span id="retrySlider" style="position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:#333;border-radius:28px;transition:.3s;border:1.5px solid var(--border);">
-            <span id="retryKnob" style="position:absolute;height:20px;width:20px;left:3px;bottom:3px;background:var(--muted);border-radius:50%;transition:.3s;"></span>
-          </span>
-        </label>
-        <span id="retryStatusLabel" style="font-size:13px;font-weight:700;color:var(--muted);">—</span>
-      </div>
-    </div>
-
-    <div id="retryMsg" style="margin-top:12px;font-size:12px;min-height:18px;text-align:center;"></div>
-  </div>
+    
 
   <!-- FREE TRIAL MASTER SWITCH -->
   <div class="card">
@@ -503,31 +474,18 @@ body{min-height:100vh;background:var(--bg);color:var(--text);
       Reset All Trials
     </div>
     <p style="font-size:12px;color:var(--muted);margin-bottom:14px;">সব PC এর trial history মুছে যাবে। আগে trial নেওয়া সব PC আবার নতুন trial পাবে। Activation keys এবং settings অপরিবর্তিত থাকবে।</p>
-    <button class="btn btn-red" onclick="resetAllTrials()" style="font-size:12px;">
-      🗑️ Reset All Trial History
-    </button>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+      <button class="btn btn-red" onclick="resetAllTrials()" style="font-size:12px;">
+        🗑️ Reset All Trial History
+      </button>
+      <button class="btn" onclick="resetExpiredTrials()" style="font-size:12px;background:rgba(245,158,11,0.15);border:1.5px solid rgba(245,158,11,0.5);color:#f59e0b;">
+        🗑️ Reset Expired PC Trial History
+      </button>
+    </div>
     <div id="resetTrialMsg" style="margin-top:12px;font-size:12px;min-height:18px;text-align:center;"></div>
   </div>
 
   <!-- RESET RETRY USED -->
-  <div class="card">
-    <div class="card-title">
-      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-      </svg>
-      Give Retry Chance Again
-    </div>
-    <p style="font-size:12px;color:var(--muted);margin-bottom:14px;">
-      যারা আগে Retry Trial ব্যবহার করে ফেলেছে তাদের <b>retry_used</b> reset করুন — তারা আবার ১বার Free Trial পাবে।<br>
-      <span style="color:var(--yellow);">⚠ এটা শুধু retry সুযোগ দেয় — সম্পূর্ণ history মুছে না।</span>
-    </p>
-    <button class="btn" style="background:rgba(99,102,241,0.15);border:1.5px solid rgba(99,102,241,0.5);color:#818cf8;font-size:12px;" onclick="resetRetryUsed()">
-      🔄 Give Retry Chance Again
-    </button>
-    <div id="resetRetryMsg" style="margin-top:12px;font-size:12px;min-height:18px;text-align:center;"></div>
-  </div>
-
-  <!-- ACTIVITY LOG -->
   <div class="card">
     <div class="section-row" style="margin-bottom:14px;">
       <div class="card-title" style="margin-bottom:0;">
@@ -1242,6 +1200,24 @@ window.addEventListener('load', () => {
           if(msg){ msg.style.color='var(--red)'; msg.textContent='❌ '+d.message; }
         }
       } catch(e) { if(msg){msg.textContent='❌ Error: '+e.message;msg.style.color='var(--red)';} }
+    }
+
+    async function resetExpiredTrials() {
+      if (!confirm('শুধু expired PC এর trial history মুছে যাবে। Active trial গুলো অপরিবর্তিত থাকবে। নিশ্চিত?')) return;
+      const url = document.getElementById('serverUrl').value.trim();
+      const key = document.getElementById('adminKey').value.trim();
+      const msg = document.getElementById('resetTrialMsg');
+      if (!url || !key) { if(msg){msg.textContent='⚠ Server URL ও Admin Key দিন';msg.style.color='var(--yellow)';} return; }
+      try {
+        const r = await fetch(url+'/api/admin/reset-expired-trials',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({admin_key:key})});
+        const d = await r.json();
+        if (d.success) {
+          if(msg){ msg.style.color='var(--green)'; msg.textContent='✅ '+d.message; setTimeout(()=>{if(msg)msg.textContent='';},4000); }
+          log('✓ Reset expired trials: ' + d.reset_count + ' PCs removed', 'ok');
+        } else {
+          if(msg){msg.textContent='❌ '+(d.message||'Failed');msg.style.color='var(--red)';}
+        }
+      } catch(e) { if(msg){msg.textContent='❌ Server connect failed';msg.style.color='var(--red)';} }
     }
 
 </script>
