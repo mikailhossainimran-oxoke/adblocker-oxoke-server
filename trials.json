@@ -1,3 +1,9 @@
 {
-  "used_pcs": {}
+  "used_pcs": {
+    "24e8ec46e95628bd": {
+      "key": "TRIAL-TPY60-P4MVT",
+      "expiry": "2026-03-13T18:24:05.183Z",
+      "created": "2026-03-06T16:54:05.183Z"
+    }
+  }
 }
