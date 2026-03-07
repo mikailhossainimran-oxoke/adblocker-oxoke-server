@@ -399,7 +399,7 @@ body{min-height:100vh;background:var(--bg);color:var(--text);
   </div>
   <p style="font-size:12px;color:var(--muted);margin-bottom:16px;">
     <b>OFF</b> করলে নতুন ও পুরনো সকল PC এর Free Trial বন্ধ হবে।<br>
-    <b>ON</b> করলে শুধু <b>নতুন PC</b> trial পাবে — Expired PC পাবে না।
+    <b>ON</b> করলে স্বাভাবিক — নতুন PC trial পাবে, Expired PC তাদের নিজস্ব switch অনুযায়ী।
   </p>
   <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
     <div style="display:flex;align-items:center;gap:12px;">
@@ -940,8 +940,8 @@ async function setTrialEnabled(enabled) {
     const d = await r.json();
     if (d.success) {
       applyToggleUI('trialEnSlider','trialEnKnob','trialEnLabel','trialEnabledToggle', d.trial_enabled, 'ON','OFF','var(--accent)');
-      if(msg){ msg.textContent = d.trial_enabled ? '✅ All Trial ON — শুধু নতুন PC trial পাবে' : '🔴 All Trial OFF — কেউ trial পাবে না'; msg.style.color = d.trial_enabled ? 'var(--green)' : 'var(--red)'; }
-      log(d.trial_enabled ? '✅ All Trial enabled (new PC only)' : '🔴 All Trial disabled', d.trial_enabled ? 'ok' : 'err');
+      if(msg){ msg.textContent = d.trial_enabled ? '✅ All Trial ON — স্বাভাবিক' : '🔴 All Trial OFF — কেউ trial পাবে না'; msg.style.color = d.trial_enabled ? 'var(--green)' : 'var(--red)'; }
+      log(d.trial_enabled ? '✅ All Trial enabled' : '🔴 All Trial disabled', d.trial_enabled ? 'ok' : 'err');
     } else { if(tog)tog.checked=!enabled; if(msg){msg.textContent='❌ '+d.message;msg.style.color='var(--red)';} }
   } catch(e) { if(tog)tog.checked=!enabled; if(msg){msg.textContent='❌ Server connect failed';msg.style.color='var(--red)';} }
 }
