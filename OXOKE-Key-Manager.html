@@ -364,29 +364,6 @@ body{min-height:100vh;background:var(--bg);color:var(--text);
     <div id="trialMsg" style="margin-top:10px;font-size:12px;min-height:18px;text-align:center;"></div>
   </div>
 
-  <!-- RETRY TRIAL -->
-  <div class="card" style="border-color:#dc2626;">
-  <div class="card-title">
-    ⚠️ Trials Data Persistence — GitHub Setup
-  </div>
-  <p style="font-size:13px;color:#94a3b8;margin-bottom:14px;">
-    Render free plan এ server restart হলে <strong style="color:#f87171;">trials.json মুছে যায়</strong> — তাই extension reinstall করলে same PC তে আবার trial পায়।<br>
-    এটা ঠেকাতে নিচের steps follow করুন:
-  </p>
-  <div style="background:#0f172a;border:1px solid #334155;border-radius:8px;padding:14px;font-size:12px;line-height:2;color:#94a3b8;">
-    <strong style="color:#38bdf8;">Step 1 — GitHub Token তৈরি করুন:</strong><br>
-    GitHub → Settings → Developer settings → Personal access tokens → Generate new token (classic)<br>
-    ✅ repo permission দিন → Token copy করুন<br><br>
-    <strong style="color:#38bdf8;">Step 2 — Render এ Environment Variables যোগ করুন:</strong><br>
-    Render → adblocker-oxoke-server → Environment → Add Environment Variable<br>
-    GITHUB_TOKEN = আপনার token<br>
-    GITHUB_REPO = mikailhossainimran-oxoke/adblocker-oxoke-server<br><br>
-    <strong style="color:#38bdf8;">Step 3 — GitHub repository তে trials.json তৈরি করুন:</strong><br>
-    Repository → Add file → Create new file → নাম: trials.json<br>
-    Content: {&quot;used_pcs&quot;:{}} → Commit changes<br><br>
-    <strong style="color:#4ade80;">✅ Render Manual Deploy করুন — এরপর trials data permanent!</strong>
-  </div>
-</div>
 
 <!-- ===== EXTENSION MASTER SWITCH ===== -->
 <div class="card">
@@ -412,7 +389,7 @@ body{min-height:100vh;background:var(--bg);color:var(--text);
   <div id="extMsg" style="margin-top:12px;font-size:12px;min-height:18px;text-align:center;"></div>
 </div>
 
-<!-- ===== FREE TRIAL ON/OFF ===== -->
+<!-- ===== FREE TRIAL SWITCH ===== -->
 <div class="card">
   <div class="card-title">
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -436,48 +413,18 @@ body{min-height:100vh;background:var(--bg);color:var(--text);
   <div id="trialEnMsg" style="margin-top:12px;font-size:12px;min-height:18px;text-align:center;"></div>
 </div>
 
-<!-- ===== FREE TRIAL RETRY CONTROL ===== -->
-<div class="card">
-  <div class="card-title">
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-      <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>
-    </svg>
-    Free Trial Retry Control
-  </div>
-  <p style="font-size:12px;color:var(--muted);margin-bottom:16px;"><b>ON</b> করলে যাদের free trial শেষ হয়ে গেছে তারা আবার নতুন করে free trial পাবে। <b>OFF</b> করলে বন্ধ হবে।</p>
-  <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
-    <div style="display:flex;align-items:center;gap:12px;">
-      <span style="font-size:13px;color:var(--muted);">Retry Trial:</span>
-      <label style="position:relative;display:inline-block;width:52px;height:28px;cursor:pointer;">
-        <input type="checkbox" id="retryTrialToggle" style="opacity:0;width:0;height:0;" onchange="setRetryTrial(this.checked)">
-        <span id="retrySlider" style="position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:#333;border-radius:28px;transition:.3s;border:1.5px solid var(--border);">
-          <span id="retryKnob" style="position:absolute;height:20px;width:20px;left:3px;bottom:3px;background:var(--muted);border-radius:50%;transition:.3s;"></span>
-        </span>
-      </label>
-      <span id="retryStatusLabel" style="font-size:13px;font-weight:700;color:var(--muted);">—</span>
-    </div>
-    <button class="btn btn-outline" onclick="loadAllSettings(true)" style="font-size:11px;padding:6px 14px;">🔄 Refresh</button>
-  </div>
-  <div id="retryMsg" style="margin-top:12px;font-size:12px;min-height:18px;text-align:center;"></div>
-</div>
-
-<!-- ===== RESET TRIAL HISTORY ===== -->
+<!-- ===== RESET EXPIRED PC TRIAL HISTORY ===== -->
 <div class="card">
   <div class="card-title">
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
       <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
     </svg>
-    Reset Trial History
+    Reset Expired PC Trial History
   </div>
-  <p style="font-size:12px;color:var(--muted);margin-bottom:16px;">Trial history reset করলে extension নতুন PC এর মতো fresh শুরু করবে।</p>
-  <div style="display:flex;flex-direction:column;gap:10px;">
-    <button class="btn btn-red" onclick="resetAllTrials()" style="font-size:12px;">
-      🗑️ Reset All Trial History — সবার trial মুছে ফেলবে
-    </button>
-    <button class="btn" onclick="resetExpiredTrials()" style="font-size:12px;background:rgba(245,158,11,0.15);border:1.5px solid rgba(245,158,11,0.5);color:#f59e0b;">
-      🗑️ Reset Expired PC Trial History — শুধু expired PC মুছবে
-    </button>
-  </div>
+  <p style="font-size:12px;color:var(--muted);margin-bottom:16px;">শুধু Expired PC এর trial history মুছে ফেলবে। Active trial ও নতুন PC এ কোনো পরিবর্তন হবে না।</p>
+  <button class="btn" onclick="resetExpiredTrials()" style="font-size:12px;background:rgba(245,158,11,0.15);border:1.5px solid rgba(245,158,11,0.5);color:#f59e0b;width:100%;">
+    🗑️ Reset Expired PC Trial History
+  </button>
   <div id="resetTrialMsg" style="margin-top:12px;font-size:12px;min-height:18px;text-align:center;"></div>
 </div>
 
@@ -921,8 +868,6 @@ async function loadAllSettings(manual=false) {
     applyToggleUI('extSlider','extKnob','extStatusLabel','extensionEnabledToggle', cfg.extension_enabled!==false, 'ON','OFF','var(--green)');
     // Trial enabled
     applyToggleUI('trialEnSlider','trialEnKnob','trialEnLabel','trialEnabledToggle', cfg.trial_enabled!==false, 'ON','OFF','var(--accent)');
-    // Retry trial
-    applyToggleUI('retrySlider','retryKnob','retryStatusLabel','retryTrialToggle', !!(cfg.allow_retry_trial||cfg.unlimited_retry), 'ON','OFF','var(--green)');
     // Trial duration
     if (cfg.trial_duration_ms) {
       const ms = cfg.trial_duration_ms;
@@ -979,45 +924,9 @@ async function setTrialEnabled(enabled) {
 // ============================================================
 // RETRY TRIAL toggle
 // ============================================================
-async function loadRetryStatus(manual=false) { await loadAllSettings(manual); }
-
-async function setRetryTrial(enabled) {
-  const url = document.getElementById('serverUrl').value.trim();
-  const key = document.getElementById('adminKey').value.trim();
-  const msg = document.getElementById('retryMsg');
-  const tog = document.getElementById('retryTrialToggle');
-  if (!url || !key) { if(tog)tog.checked=!enabled; if(msg){msg.textContent='⚠ Server URL ও Admin Key দিন';msg.style.color='var(--yellow)';}return; }
-  try {
-    const r = await fetch(url+'/api/admin/set-unlimited-retry',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({admin_key:key,enabled:enabled})});
-    const d = await r.json();
-    if (d.success) {
-      applyToggleUI('retrySlider','retryKnob','retryStatusLabel','retryTrialToggle', d.unlimited_retry, 'ON','OFF','var(--green)');
-      if(msg){ msg.textContent = d.unlimited_retry ? '✅ Retry ON — Expired users can retry' : '✅ Retry OFF — Expired users blocked'; msg.style.color = d.unlimited_retry ? 'var(--green)' : 'var(--muted)'; }
-    } else { if(tog)tog.checked=!enabled; if(msg){msg.textContent='❌ '+d.message;msg.style.color='var(--red)';} }
-  } catch(e) { if(tog)tog.checked=!enabled; if(msg){msg.textContent='❌ Server connect failed';msg.style.color='var(--red)';} }
-}
-
-function applyRetryUI(isOn) {
-  applyToggleUI('retrySlider','retryKnob','retryStatusLabel','retryTrialToggle', isOn, 'ON','OFF','var(--green)');
-}
-
 // ============================================================
 // RESET TRIAL HISTORY
 // ============================================================
-async function resetAllTrials() {
-  if (!confirm('সব PC এর Trial History মুছে ফেলবে?\nএই কাজটি undo করা যাবে না।')) return;
-  const url = document.getElementById('serverUrl').value.trim();
-  const key = document.getElementById('adminKey').value.trim();
-  const msg = document.getElementById('resetTrialMsg');
-  if (!url || !key) { if(msg){msg.textContent='⚠ Server URL ও Admin Key দিন';msg.style.color='var(--yellow)';}return; }
-  try {
-    const r = await fetch(url+'/api/admin/reset-trials',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({admin_key:key})});
-    const d = await r.json();
-    if(d.success){ if(msg){msg.textContent='✅ সব Trial History মুছে ফেলা হয়েছে।';msg.style.color='var(--green)';} log('✅ All trials reset','ok'); }
-    else { if(msg){msg.textContent='❌ Reset failed';msg.style.color='var(--red)';} }
-  } catch(e){ if(msg){msg.textContent='❌ Server connect failed';msg.style.color='var(--red)';} }
-}
-
 async function resetExpiredTrials() {
   if (!confirm('শুধু Expired PC এর Trial History মুছে ফেলবে?')) return;
   const url = document.getElementById('serverUrl').value.trim();
@@ -1039,27 +948,29 @@ async function resetExpiredTrials() {
   const key = document.getElementById('adminKey').value.trim();
   const msg = document.getElementById('trialMsg');
   try {
-    const res = await fetch(url + '/api/admin/trial-config', {
+    const res = await fetch(url + '/api/admin/get-config', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ admin_key: key })
     });
     const data = await res.json();
-    if (data.success) {
-      const totalMs = data.trial_duration_ms || (2 * 3600 * 1000);
-      const h = Math.floor(totalMs / 3600000);
+    if (data.success && data.config) {
+      const totalMs = data.config.trial_duration_ms || 7200000;
+      const d = Math.floor(totalMs / 86400000);
+      const h = Math.floor((totalMs % 86400000) / 3600000);
       const m = Math.floor((totalMs % 3600000) / 60000);
+      document.getElementById('trialDays').value = d;
       document.getElementById('trialHours').value = h;
       document.getElementById('trialMinutes').value = m;
       msg.style.color = 'var(--green)';
-      msg.textContent = '✓ Current trial: ' + h + 'h ' + m + 'm';
+      msg.textContent = '✓ Current trial: ' + d + 'd ' + h + 'h ' + m + 'm';
     } else {
       msg.style.color = 'var(--yellow)';
       msg.textContent = '⚠ ' + (data.message || 'Could not load');
     }
   } catch(e) {
     msg.style.color = 'var(--muted)';
-    msg.textContent = 'Using default: 0d 2h 0m';
+    msg.textContent = 'Server offline';
   }
 }
 
@@ -1092,7 +1003,7 @@ async function saveTrialDuration() {
     const data = await res.json();
     if (data.success) {
       msg.style.color = 'var(--green)';
-      msg.textContent = '✓ Trial duration saved: ' + hours + 'h ' + minutes + 'm';
+      msg.textContent = '✓ Trial duration saved: ' + days + 'd ' + hours + 'h ' + minutes + 'm';
     } else {
       msg.style.color = 'var(--red)';
       msg.textContent = '⚠ ' + (data.message || 'Save failed');
