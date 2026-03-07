@@ -267,10 +267,11 @@ app.post('/api/check-trial-status', async (req, res) => {
   if (!cfg.trial_enabled) return res.json({ trial_disabled: true, used: false });
 
   const hashedPc = hashId(pc_fingerprint);
-  if (!_trialsMemory && GITHUB_TOKEN && GITHUB_REPO) {
+  // সবসময় GitHub থেকে fresh trial data নাও — stale memory তে expired record miss হতে পারে
+  if (GITHUB_TOKEN && GITHUB_REPO) {
     await loadTrialsFromGitHub().catch(() => {});
-    if (!_trialsMemory) return res.json({ used: true, retry_allowed: false, reason: 'data_loading' });
   }
+  if (!_trialsMemory) return res.json({ used: true, retry_allowed: false, reason: 'data_loading' });
 
   const trials = loadTrials();
   const record = trials.used_pcs[hashedPc];
