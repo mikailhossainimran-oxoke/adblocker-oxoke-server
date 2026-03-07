@@ -1,5 +1,5 @@
 {
-  "trial_duration_ms": 2592000000,
+  "trial_duration_ms": 180000,
   "trial_enabled": true,
   "extension_enabled": true,
   "expired_trial_enabled": true,
