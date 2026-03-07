@@ -240,16 +240,7 @@ app.post('/api/get-trial', async (req, res) => {
       // Trial এখনো active — resume
       return res.json({ success: true, key: prev.key, expiry: prev.expiry, duration_ms: cfg.trial_duration_ms, message: 'Trial reactivated.' });
     }
-    // Trial expired — expired_trial_enabled ON থাকলে নতুন trial দাও
-    if (cfg.expired_trial_enabled === true) {
-      const trialKey = generateTrialKey();
-      const trialDurationMs = cfg.trial_duration_ms || 7200000;
-      const expiry = new Date(Date.now() + trialDurationMs).toISOString();
-      trials.used_pcs[hashedPc] = { key: trialKey, expiry, created: new Date().toISOString(), retried: true };
-      await saveTrials(trials);
-      return res.json({ success: true, key: trialKey, expiry, type: 'trial', duration_ms: trialDurationMs, message: 'Trial restarted.' });
-    }
-    // Block
+    // Trial expired — সবসময় block। Reset করলে record delete হবে, তখন নতুন trial পাবে।
     return res.status(403).json({ success: false, message: 'Free trial already used. Purchase a license: +8801811507607' });
   }
 
@@ -287,9 +278,8 @@ app.post('/api/check-trial-status', async (req, res) => {
 
   const isExpired = record.expiry && Date.now() > new Date(record.expiry).getTime();
   if (!isExpired) return res.json({ used: true, active: true, expiry: record.expiry, retry_allowed: false });
-  // Expired — expired_trial_enabled ON থাকলে retry allowed
-  const retryAllowed = cfg.expired_trial_enabled === true;
-  return res.json({ used: true, active: false, expiry: record.expiry || null, retry_allowed: retryAllowed });
+  // Expired — সবসময় blocked। Reset করলে record delete হবে, তখন নতুন trial পাবে।
+  return res.json({ used: true, active: false, expiry: record.expiry || null, retry_allowed: false });
 });
 
 // ==============================
