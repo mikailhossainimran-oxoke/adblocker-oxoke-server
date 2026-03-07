@@ -1,5 +1,5 @@
 {
-  "trial_duration_ms": 300000,
+  "trial_duration_ms": 360000,
   "trial_enabled": true,
   "extension_enabled": true,
   "unlimited_retry": true,
