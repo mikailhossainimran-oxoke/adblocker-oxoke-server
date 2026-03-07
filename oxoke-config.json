@@ -1,9 +1,7 @@
 {
-  "trial_duration_ms": 19800000,
-  "allow_retry_trial": true,
+  "trial_duration_ms": 7200000,
   "trial_enabled": true,
   "extension_enabled": true,
-  "unlimited_retry": true,
-  "retry_limit": 0,
-  "global_retry_ts": 1772834619686
+  "unlimited_retry": false,
+  "allow_retry_trial": false
 }
