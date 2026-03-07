@@ -389,18 +389,21 @@ body{min-height:100vh;background:var(--bg);color:var(--text);
   <div id="extMsg" style="margin-top:12px;font-size:12px;min-height:18px;text-align:center;"></div>
 </div>
 
-<!-- ===== FREE TRIAL SWITCH ===== -->
+<!-- ===== ALL TRIAL SWITCH (নতুন + পুরনো সকলের জন্য) ===== -->
 <div class="card">
   <div class="card-title">
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
       <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
     </svg>
-    Free Trial Switch
+    All Trial Switch
   </div>
-  <p style="font-size:12px;color:var(--muted);margin-bottom:16px;"><b>OFF</b> করলে কেউ আর Free Trial নিতে পারবে না — নতুন ও পুরনো সকল PC এর জন্য। <b>ON</b> করলে আবার trial চালু হবে।</p>
+  <p style="font-size:12px;color:var(--muted);margin-bottom:16px;">
+    <b>OFF</b> করলে নতুন ও পুরনো সকল PC এর Free Trial বন্ধ হবে।<br>
+    <b>ON</b> করলে শুধু <b>নতুন PC</b> trial পাবে — Expired PC পাবে না।
+  </p>
   <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
     <div style="display:flex;align-items:center;gap:12px;">
-      <span style="font-size:13px;color:var(--muted);">Free Trial:</span>
+      <span style="font-size:13px;color:var(--muted);">All Trial:</span>
       <label style="position:relative;display:inline-block;width:52px;height:28px;cursor:pointer;">
         <input type="checkbox" id="trialEnabledToggle" style="opacity:0;width:0;height:0;" onchange="setTrialEnabled(this.checked)">
         <span id="trialEnSlider" style="position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:#333;border-radius:28px;transition:.3s;border:1.5px solid var(--border);">
@@ -411,6 +414,34 @@ body{min-height:100vh;background:var(--bg);color:var(--text);
     </div>
   </div>
   <div id="trialEnMsg" style="margin-top:12px;font-size:12px;min-height:18px;text-align:center;"></div>
+</div>
+
+<!-- ===== EXPIRED PC TRIAL SWITCH ===== -->
+<div class="card">
+  <div class="card-title">
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+      <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+    </svg>
+    Expired PC Trial Switch
+  </div>
+  <p style="font-size:12px;color:var(--muted);margin-bottom:16px;">
+    <b>ON</b> করলে Expired PC গুলো আবার একবার Free Trial পাবে।<br>
+    <b>OFF</b> করলে Expired PC আর trial পাবে না।<br>
+    <span style="color:var(--yellow);">⚠ All Trial Switch OFF থাকলে এটা কাজ করবে না।</span>
+  </p>
+  <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <span style="font-size:13px;color:var(--muted);">Expired PC Trial:</span>
+      <label style="position:relative;display:inline-block;width:52px;height:28px;cursor:pointer;">
+        <input type="checkbox" id="expiredTrialToggle" style="opacity:0;width:0;height:0;" onchange="setExpiredTrialEnabled(this.checked)">
+        <span id="expiredTrialSlider" style="position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:#333;border-radius:28px;transition:.3s;border:1.5px solid var(--border);">
+          <span id="expiredTrialKnob" style="position:absolute;height:20px;width:20px;left:3px;bottom:3px;background:var(--muted);border-radius:50%;transition:.3s;"></span>
+        </span>
+      </label>
+      <span id="expiredTrialLabel" style="font-size:13px;font-weight:700;color:var(--muted);">—</span>
+    </div>
+  </div>
+  <div id="expiredTrialMsg" style="margin-top:12px;font-size:12px;min-height:18px;text-align:center;"></div>
 </div>
 
 <!-- ===== RESET EXPIRED PC TRIAL HISTORY ===== -->
@@ -868,6 +899,8 @@ async function loadAllSettings(manual=false) {
     applyToggleUI('extSlider','extKnob','extStatusLabel','extensionEnabledToggle', cfg.extension_enabled!==false, 'ON','OFF','var(--green)');
     // Trial enabled
     applyToggleUI('trialEnSlider','trialEnKnob','trialEnLabel','trialEnabledToggle', cfg.trial_enabled!==false, 'ON','OFF','var(--accent)');
+    // Expired PC trial
+    applyToggleUI('expiredTrialSlider','expiredTrialKnob','expiredTrialLabel','expiredTrialToggle', cfg.expired_trial_enabled===true, 'ON','OFF','var(--yellow)');
     // Trial duration
     if (cfg.trial_duration_ms) {
       const ms = cfg.trial_duration_ms;
@@ -915,8 +948,28 @@ async function setTrialEnabled(enabled) {
     const d = await r.json();
     if (d.success) {
       applyToggleUI('trialEnSlider','trialEnKnob','trialEnLabel','trialEnabledToggle', d.trial_enabled, 'ON','OFF','var(--accent)');
-      if(msg){ msg.textContent = d.trial_enabled ? '✅ Free Trial ON — সবাই trial নিতে পারবে' : '🔴 Free Trial OFF — কেউ trial নিতে পারবে না'; msg.style.color = d.trial_enabled ? 'var(--green)' : 'var(--red)'; }
-      log(d.trial_enabled ? '✅ Free Trial enabled' : '🔴 Free Trial disabled', d.trial_enabled ? 'ok' : 'err');
+      if(msg){ msg.textContent = d.trial_enabled ? '✅ All Trial ON — শুধু নতুন PC trial পাবে' : '🔴 All Trial OFF — কেউ trial পাবে না'; msg.style.color = d.trial_enabled ? 'var(--green)' : 'var(--red)'; }
+      log(d.trial_enabled ? '✅ All Trial enabled (new PC only)' : '🔴 All Trial disabled', d.trial_enabled ? 'ok' : 'err');
+    } else { if(tog)tog.checked=!enabled; if(msg){msg.textContent='❌ '+d.message;msg.style.color='var(--red)';} }
+  } catch(e) { if(tog)tog.checked=!enabled; if(msg){msg.textContent='❌ Server connect failed';msg.style.color='var(--red)';} }
+}
+
+// ============================================================
+// EXPIRED PC TRIAL toggle
+// ============================================================
+async function setExpiredTrialEnabled(enabled) {
+  const url = document.getElementById('serverUrl').value.trim();
+  const key = document.getElementById('adminKey').value.trim();
+  const msg = document.getElementById('expiredTrialMsg');
+  const tog = document.getElementById('expiredTrialToggle');
+  if (!url || !key) { if(tog)tog.checked=!enabled; if(msg){msg.textContent='⚠ Server URL ও Admin Key দিন';msg.style.color='var(--yellow)';}return; }
+  try {
+    const r = await fetch(url+'/api/admin/set-expired-trial-enabled',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({admin_key:key,expired_trial_enabled:enabled})});
+    const d = await r.json();
+    if (d.success) {
+      applyToggleUI('expiredTrialSlider','expiredTrialKnob','expiredTrialLabel','expiredTrialToggle', d.expired_trial_enabled, 'ON','OFF','var(--yellow)');
+      if(msg){ msg.textContent = d.expired_trial_enabled ? '✅ Expired PC Trial ON — তারা আবার trial পাবে' : '✅ Expired PC Trial OFF — তারা trial পাবে না'; msg.style.color = d.expired_trial_enabled ? 'var(--green)' : 'var(--muted)'; }
+      log(d.expired_trial_enabled ? '✅ Expired PC trial enabled' : '✅ Expired PC trial disabled', 'ok');
     } else { if(tog)tog.checked=!enabled; if(msg){msg.textContent='❌ '+d.message;msg.style.color='var(--red)';} }
   } catch(e) { if(tog)tog.checked=!enabled; if(msg){msg.textContent='❌ Server connect failed';msg.style.color='var(--red)';} }
 }
