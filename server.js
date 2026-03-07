@@ -63,7 +63,16 @@ async function saveTrialsToGitHub(data) {
   if (!GITHUB_TOKEN || !GITHUB_REPO) return;
   const content = Buffer.from(JSON.stringify(data, null, 2)).toString('base64');
   const body = { message: 'update trials', content, sha: _trialsSha };
-  const res = await ghRequest('PUT', 'trials.json', body);
+  let res = await ghRequest('PUT', 'trials.json', body);
+  if (!res || !res.content) {
+    // SHA mismatch হলে fresh SHA নিয়ে আবার try করো
+    const fresh = await ghRequest('GET', 'trials.json', null).catch(() => null);
+    if (fresh && fresh.sha) {
+      _trialsSha = fresh.sha;
+      const body2 = { message: 'update trials', content, sha: _trialsSha };
+      res = await ghRequest('PUT', 'trials.json', body2);
+    }
+  }
   if (res && res.content) _trialsSha = res.content.sha;
 }
 
@@ -212,14 +221,15 @@ app.post('/api/get-trial', async (req, res) => {
   const { pc_fingerprint } = req.body;
   if (!pc_fingerprint) return res.status(400).json({ success: false, message: 'Missing pc_fingerprint' });
 
-  if (!_configMemory && GITHUB_TOKEN && GITHUB_REPO) await loadConfigFromGitHub().catch(() => {});
+  // Config সবসময় GitHub থেকে fresh নাও — stale config এ expired_trial_enabled miss হতে পারে
+  if (GITHUB_TOKEN && GITHUB_REPO) await loadConfigFromGitHub().catch(() => {});
   const cfg = loadConfig();
 
   if (!cfg.extension_enabled) return res.status(403).json({ success: false, message: 'Extension under maintenance.', maintenance: true });
   if (!cfg.trial_enabled) return res.status(403).json({ success: false, message: 'Free trial is currently disabled.', trial_disabled: true });
 
   const hashedPc = hashId(pc_fingerprint);
-  if (!_trialsMemory && GITHUB_TOKEN && GITHUB_REPO) await loadTrialsFromGitHub().catch(() => {});
+  if (GITHUB_TOKEN && GITHUB_REPO) await loadTrialsFromGitHub().catch(() => {});
   const trials = loadTrials();
 
   console.log(`[get-trial] PC: ${hashedPc.slice(0, 8)}... | Total: ${Object.keys(trials.used_pcs || {}).length}`);
@@ -346,8 +356,9 @@ app.get('/admin/codes', (req, res) => {
   res.json({ total: Object.keys(out).length, codes: out });
 });
 
-app.get('/admin/trials', (req, res) => {
+app.get('/admin/trials', async (req, res) => {
   if (!checkAdmin(req, res)) return;
+  if (GITHUB_TOKEN && GITHUB_REPO) await loadTrialsFromGitHub().catch(() => {});
   const trials = loadTrials();
   const count = Object.keys(trials.used_pcs).length;
   const active = Object.values(trials.used_pcs).filter(t => new Date(t.expiry).getTime() > Date.now()).length;
@@ -464,7 +475,8 @@ app.post('/api/admin/set-expired-trial-enabled', async (req, res) => {
 app.post('/api/admin/reset-expired-trials', async (req, res) => {
   const { admin_key } = req.body;
   if (admin_key !== ADMIN_KEY) return res.status(403).json({ success: false });
-  if (!_trialsMemory && GITHUB_TOKEN && GITHUB_REPO) await loadTrialsFromGitHub().catch(() => {});
+  // সবসময় GitHub থেকে fresh data নাও — memory stale হতে পারে
+  if (GITHUB_TOKEN && GITHUB_REPO) await loadTrialsFromGitHub().catch(() => {});
   const trials = loadTrials();
   let count = 0;
   Object.keys(trials.used_pcs || {}).forEach(pc => {
