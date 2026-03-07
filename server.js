@@ -134,19 +134,21 @@ async function saveTrials(data) {
 // CONFIG — সবসময় GitHub থেকে পড়ে, GitHub এ save করে
 // _configMemory না থাকলে default ব্যবহার করে — কিন্তু save সবসময় GitHub এ যায়
 function loadConfig() {
-  if (_configMemory) return Object.assign({
-    trial_duration_ms: 7200000,
-    trial_enabled: true,
-    extension_enabled: true,
-    expired_trial_enabled: false, // default: expired PC trial OFF
-  }, _configMemory);
+  if (_configMemory) {
+    return {
+      trial_duration_ms: _configMemory.trial_duration_ms || 7200000,
+      trial_enabled: _configMemory.trial_enabled !== undefined ? _configMemory.trial_enabled : true,
+      extension_enabled: _configMemory.extension_enabled !== undefined ? _configMemory.extension_enabled : true,
+      expired_trial_enabled: _configMemory.expired_trial_enabled === true, // explicit boolean
+    };
+  }
   // GitHub না থাকলে local data.json fallback
   const d = loadData();
   return {
     trial_duration_ms: d.trial_duration_ms || 7200000,
     trial_enabled: d.trial_enabled !== undefined ? d.trial_enabled : true,
     extension_enabled: d.extension_enabled !== undefined ? d.extension_enabled : true,
-    expired_trial_enabled: d.expired_trial_enabled !== undefined ? d.expired_trial_enabled : false,
+    expired_trial_enabled: d.expired_trial_enabled === true,
   };
 }
 
@@ -242,14 +244,17 @@ app.post('/api/get-trial', async (req, res) => {
       return res.json({ success: true, key: prev.key, expiry: prev.expiry, duration_ms: cfg.trial_duration_ms, message: 'Trial reactivated.' });
     }
     // Trial expired — expired_trial_enabled ON থাকলে নতুন trial দাও
+    console.log(`[get-trial] Expired PC detected. expired_trial_enabled=${cfg.expired_trial_enabled}`);
     if (cfg.expired_trial_enabled === true) {
       const trialKey = generateTrialKey();
       const trialDurationMs = cfg.trial_duration_ms || 7200000;
       const expiry = new Date(Date.now() + trialDurationMs).toISOString();
       trials.used_pcs[hashedPc] = { key: trialKey, expiry, created: new Date().toISOString(), restarted: true };
       await saveTrials(trials);
+      console.log(`[get-trial] Expired PC restarted: ${hashedPc.slice(0,8)}...`);
       return res.json({ success: true, key: trialKey, expiry, type: 'trial', duration_ms: trialDurationMs, message: 'Trial restarted.' });
     }
+    console.log(`[get-trial] Expired PC blocked (expired_trial_enabled=false)`);
     return res.status(403).json({ success: false, message: 'Free trial already used. Purchase a license: +8801811507607' });
   }
 
@@ -467,7 +472,7 @@ app.post('/api/admin/set-expired-trial-enabled', async (req, res) => {
   const cfg = loadConfig();
   cfg.expired_trial_enabled = !!expired_trial_enabled;
   await saveConfig(cfg);
-  console.log(`[Admin] Expired trial enabled: ${cfg.expired_trial_enabled}`);
+  console.log(`[Admin] Expired trial enabled set to: ${cfg.expired_trial_enabled} | Full config: ${JSON.stringify(cfg)}`);
   return res.json({ success: true, expired_trial_enabled: cfg.expired_trial_enabled });
 });
 
