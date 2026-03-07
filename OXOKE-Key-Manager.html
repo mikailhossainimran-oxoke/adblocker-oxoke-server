@@ -416,23 +416,37 @@ body{min-height:100vh;background:var(--bg);color:var(--text);
   <div id="trialEnMsg" style="margin-top:12px;font-size:12px;min-height:18px;text-align:center;"></div>
 </div>
 
-<!-- ===== RESET EXPIRED PC TRIAL ===== -->
+<!-- ===== EXPIRED PC TRIAL CONTROL ===== -->
 <div class="card">
   <div class="card-title">
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
       <polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4"/>
     </svg>
-    Reset Expired PC Trial
+    Expired PC Trial Control
   </div>
   <p style="font-size:12px;color:var(--muted);margin-bottom:16px;">
-    🔄 <b>Reset</b> করলে সকল Expired PC এর trial history মুছে যাবে।<br>
-    তারা আবার একবার নতুন করে Free Trial পাবে।<br>
-    সেই trial শেষ হলে আবার blocked হবে।<br>
-    পরের বার Reset করলে আবার একবার trial পাবে — এভাবে চলবে।<br>
+    Expired PC বা Chrome Profile গুলোকে আবার Free Trial দেওয়ার নিয়ন্ত্রণ।<br>
+    <b>Switch ON</b> → Expired PC গুলো সাথে সাথে আবার Free Trial পাবে।<br>
+    <b>Switch OFF</b> → Expired PC গুলো আর trial পাবে না।<br>
+    <b>🔄 Re-start</b> → History মুছে নতুন করে শুরু (যতবার মন চাইবে)।<br>
     <span style="color:var(--yellow);">⚠ Active trial ও নতুন PC তে কোনো পরিবর্তন হবে না।</span>
   </p>
+
+  <!-- Toggle -->
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
+    <span style="font-size:13px;color:var(--muted);">Expired PC Trial:</span>
+    <label style="position:relative;display:inline-block;width:52px;height:28px;cursor:pointer;">
+      <input type="checkbox" id="expiredTrialToggle" style="opacity:0;width:0;height:0;" onchange="setExpiredTrialEnabled(this.checked)">
+      <span id="expiredTrialSlider" style="position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:#333;border-radius:28px;transition:.3s;border:1.5px solid var(--border);">
+        <span id="expiredTrialKnob" style="position:absolute;height:20px;width:20px;left:3px;bottom:3px;background:var(--muted);border-radius:50%;transition:.3s;"></span>
+      </span>
+    </label>
+    <span id="expiredTrialLabel" style="font-size:13px;font-weight:700;color:var(--muted);">—</span>
+  </div>
+
+  <!-- Re-start button -->
   <button class="btn" onclick="resetExpiredTrials()" style="font-size:13px;font-weight:700;background:rgba(99,102,241,0.15);border:1.5px solid rgba(99,102,241,0.5);color:#818cf8;width:100%;padding:12px;">
-    🔄 Reset Expired PC Trial
+    🔄 Re-start Expired PC Trial (History মুছে নতুন করে)
   </button>
   <div id="resetTrialMsg" style="margin-top:12px;font-size:12px;min-height:18px;text-align:center;"></div>
 </div>
@@ -877,8 +891,8 @@ async function loadAllSettings(manual=false) {
     applyToggleUI('extSlider','extKnob','extStatusLabel','extensionEnabledToggle', cfg.extension_enabled!==false, 'ON','OFF','var(--green)');
     // Trial enabled
     applyToggleUI('trialEnSlider','trialEnKnob','trialEnLabel','trialEnabledToggle', cfg.trial_enabled!==false, 'ON','OFF','var(--accent)');
-    // Expired PC trial
-    // Expired PC Trial Switch removed — Reset button only
+    // Expired PC trial toggle
+    applyToggleUI('expiredTrialSlider','expiredTrialKnob','expiredTrialLabel','expiredTrialToggle', cfg.expired_trial_enabled===true, 'ON','OFF','var(--yellow)');
     // Trial duration
     if (cfg.trial_duration_ms) {
       const ms = cfg.trial_duration_ms;
@@ -940,6 +954,23 @@ async function setTrialEnabled(enabled) {
 // ============================================================
 // RESET TRIAL HISTORY
 // ============================================================
+async function setExpiredTrialEnabled(enabled) {
+  const url = document.getElementById('serverUrl').value.trim();
+  const key = document.getElementById('adminKey').value.trim();
+  const msg = document.getElementById('resetTrialMsg');
+  const tog = document.getElementById('expiredTrialToggle');
+  if (!url || !key) { if(tog)tog.checked=!enabled; if(msg){msg.textContent='⚠ Server URL ও Admin Key দিন';msg.style.color='var(--yellow)';}return; }
+  try {
+    const r = await fetch(url+'/api/admin/set-expired-trial-enabled',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({admin_key:key,expired_trial_enabled:enabled})});
+    const d = await r.json();
+    if (d.success) {
+      applyToggleUI('expiredTrialSlider','expiredTrialKnob','expiredTrialLabel','expiredTrialToggle', d.expired_trial_enabled, 'ON','OFF','var(--yellow)');
+      if(msg){ msg.textContent = d.expired_trial_enabled ? '✅ ON — Expired PC গুলো এখনই Free Trial পাবে' : '✅ OFF — Expired PC আর trial পাবে না'; msg.style.color = d.expired_trial_enabled ? 'var(--green)' : 'var(--muted)'; }
+      log(d.expired_trial_enabled ? '✅ Expired PC trial ON' : '✅ Expired PC trial OFF', 'ok');
+    } else { if(tog)tog.checked=!enabled; if(msg){msg.textContent='❌ '+d.message;msg.style.color='var(--red)';} }
+  } catch(e) { if(tog)tog.checked=!enabled; if(msg){msg.textContent='❌ Server connect failed';msg.style.color='var(--red)';} }
+}
+
 async function resetExpiredTrials() {
   if (!confirm('Expired PC গুলো আবার একবার Free Trial পাবে। নিশ্চিত?')) return;
   const url = document.getElementById('serverUrl').value.trim();
