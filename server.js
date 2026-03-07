@@ -13,7 +13,7 @@ const GITHUB_TOKEN = process.env.GITHUB_TOKEN || '';
 const GITHUB_REPO  = process.env.GITHUB_REPO  || '';
 
 // ============================================================
-// GITHUB PERSISTENT STORAGE FOR TRIALS
+// GITHUB PERSISTENT STORAGE
 // ============================================================
 let _trialsMemory = null;
 let _trialsSha = null;
@@ -48,6 +48,7 @@ async function ghRequest(method, path2, body) {
   });
 }
 
+// --- TRIALS ---
 async function loadTrialsFromGitHub() {
   const res = await ghRequest('GET', 'trials.json', null);
   if (res && res.content) {
@@ -58,13 +59,32 @@ async function loadTrialsFromGitHub() {
   }
   return false;
 }
-
 async function saveTrialsToGitHub(data) {
   if (!GITHUB_TOKEN || !GITHUB_REPO) return;
   const content = Buffer.from(JSON.stringify(data, null, 2)).toString('base64');
   const body = { message: 'update trials', content, sha: _trialsSha };
   const res = await ghRequest('PUT', 'trials.json', body);
   if (res && res.content) _trialsSha = res.content.sha;
+}
+
+// --- CONFIG (GitHub persistent) ---
+async function loadConfigFromGitHub() {
+  if (!GITHUB_TOKEN || !GITHUB_REPO) return false;
+  const res = await ghRequest('GET', 'oxoke-config.json', null);
+  if (res && res.content) {
+    _configSha = res.sha;
+    _configMemory = JSON.parse(Buffer.from(res.content, 'base64').toString('utf8'));
+    console.log('✅ Config loaded from GitHub:', JSON.stringify(_configMemory));
+    return true;
+  }
+  return false;
+}
+async function saveConfigToGitHub(cfg) {
+  if (!GITHUB_TOKEN || !GITHUB_REPO) return;
+  const content = Buffer.from(JSON.stringify(cfg, null, 2)).toString('base64');
+  const body = { message: 'update config', content, sha: _configSha };
+  const res = await ghRequest('PUT', 'oxoke-config.json', body);
+  if (res && res.content) _configSha = res.content.sha;
 }
 
 app.use(cors());
@@ -85,7 +105,6 @@ function saveData(data) { fs.writeFileSync(DATA_FILE, JSON.stringify(data, null,
 
 function loadTrials() {
   if (_trialsMemory) return _trialsMemory;
-  // Fallback: try local file
   if (fs.existsSync(TRIAL_FILE)) {
     try { _trialsMemory = JSON.parse(fs.readFileSync(TRIAL_FILE, 'utf-8')); return _trialsMemory; } catch(e) {}
   }
@@ -94,86 +113,42 @@ function loadTrials() {
 }
 async function saveTrials(data) {
   _trialsMemory = data;
-  // Save locally as backup
   try { fs.writeFileSync(TRIAL_FILE, JSON.stringify(data, null, 2)); } catch(e) {}
-  // Save to GitHub (await করো যাতে data persist হয়)
   await saveTrialsToGitHub(data).catch(()=>{});
 }
 
-async function loadConfigFromGitHub() {
-  if (!GITHUB_TOKEN || !GITHUB_REPO) return false;
-  const res = await ghRequest('GET', 'oxoke-config.json', null);
-  if (res && res.content) {
-    _configSha = res.sha;
-    _configMemory = JSON.parse(Buffer.from(res.content, 'base64').toString('utf8'));
-    console.log('✅ Config loaded from GitHub');
-    return true;
-  }
-  return false;
-}
-
-async function saveConfigToGitHub(cfg) {
-  if (!GITHUB_TOKEN || !GITHUB_REPO) return;
-  const content = Buffer.from(JSON.stringify(cfg, null, 2)).toString('base64');
-  const body = { message: 'update config', content, sha: _configSha };
-  const res = await ghRequest('PUT', 'oxoke-config.json', body);
-  if (res && res.content) _configSha = res.content.sha;
-}
-
+// CONFIG: memory → local file — GitHub সবসময় persist করে
 function loadConfig() {
-  // Memory থেকে আগে দেখো (GitHub থেকে loaded)
   if (_configMemory) return {
-    trial_duration_ms: _configMemory.trial_duration_ms !== undefined ? _configMemory.trial_duration_ms : (2 * 60 * 60 * 1000),
-    allow_retry_trial: _configMemory.allow_retry_trial || false,
-    trial_enabled: _configMemory.trial_enabled !== undefined ? _configMemory.trial_enabled : true,
-    extension_enabled: _configMemory.extension_enabled !== undefined ? _configMemory.extension_enabled : true,
-    unlimited_retry: _configMemory.unlimited_retry || false,
-    retry_limit: _configMemory.retry_limit || 0,
-    global_retry_ts: _configMemory.global_retry_ts || 0
+    trial_duration_ms:  _configMemory.trial_duration_ms  || (2 * 60 * 60 * 1000),
+    trial_enabled:      _configMemory.trial_enabled      !== undefined ? _configMemory.trial_enabled      : true,
+    extension_enabled:  _configMemory.extension_enabled  !== undefined ? _configMemory.extension_enabled  : true,
+    unlimited_retry:    _configMemory.unlimited_retry    || false,
+    allow_retry_trial:  _configMemory.allow_retry_trial  || false,
   };
-  // Fallback: local file (GitHub না থাকলে)
+  // Fallback: local data.json
   const d = loadData();
   return {
-    trial_duration_ms: d.trial_duration_ms !== undefined ? d.trial_duration_ms : (2 * 60 * 60 * 1000),
-    allow_retry_trial: d.allow_retry_trial || false,
-    trial_enabled: d.trial_enabled !== undefined ? d.trial_enabled : true,
-    extension_enabled: d.extension_enabled !== undefined ? d.extension_enabled : true,
-    unlimited_retry: d.unlimited_retry || false,
-    retry_limit: d.retry_limit || 0,
-    global_retry_ts: d.global_retry_ts || 0
+    trial_duration_ms:  d.trial_duration_ms  || (2 * 60 * 60 * 1000),
+    trial_enabled:      d.trial_enabled      !== undefined ? d.trial_enabled      : true,
+    extension_enabled:  d.extension_enabled  !== undefined ? d.extension_enabled  : true,
+    unlimited_retry:    d.unlimited_retry    || false,
+    allow_retry_trial:  d.allow_retry_trial  || false,
   };
 }
-
-async function saveConfigAsync(cfg) {
-  // Memory update — সবার আগে
-  _configMemory = Object.assign({}, cfg);
-  // Local file update
-  const d = loadData();
-  Object.assign(d, cfg);
-  fs.writeFileSync(DATA_FILE, JSON.stringify(d, null, 2));
-  // GitHub save — await করো যাতে data persist হয়
-  await saveConfigToGitHub(cfg).catch(()=>{});
-}
-
 function saveConfig(cfg) {
-  // Memory update
-  _configMemory = Object.assign({}, cfg);
-  // Local file update
+  _configMemory = cfg;
+  // Local backup
   const d = loadData();
   Object.assign(d, cfg);
   fs.writeFileSync(DATA_FILE, JSON.stringify(d, null, 2));
-  // GitHub save (async)
+  // GitHub (async, fire and forget — but we also await in admin routes)
   saveConfigToGitHub(cfg).catch(()=>{});
 }
 
 function hashId(id) {
   return crypto.createHash('sha256').update(String(id)).digest('hex').slice(0, 16);
 }
-
-function addDays(days) {
-  return new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
-}
-
 function generateTrialKey() {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
   const seg = (n) => Array.from({length:n}, () => chars[Math.floor(Math.random()*chars.length)]).join('');
@@ -181,20 +156,14 @@ function generateTrialKey() {
 }
 
 // ==============================
-// HEALTH CHECK
-// ==============================
-// ==============================
-// AUTO UPDATE — CRX + update.xml serve
+// AUTO UPDATE
 // ==============================
 app.get('/AdBlocker-OXOKE.crx', (req, res) => {
   const crxPath = path.join(__dirname, 'AdBlocker-OXOKE.crx');
-  if (!fs.existsSync(crxPath)) {
-    return res.status(404).json({ error: 'CRX file not found. Upload AdBlocker-OXOKE.crx to server.' });
-  }
+  if (!fs.existsSync(crxPath)) return res.status(404).json({ error: 'CRX not found' });
   res.setHeader('Content-Type', 'application/x-chrome-extension');
   res.sendFile(crxPath);
 });
-
 app.get('/update.xml', (req, res) => {
   res.setHeader('Content-Type', 'application/xml');
   res.send(`<?xml version='1.0' encoding='UTF-8'?>
@@ -206,280 +175,142 @@ app.get('/update.xml', (req, res) => {
   </app>
 </gupdate>`);
 });
-
 app.get('/', (req, res) => {
-  res.json({ status: 'OXOKE Activation Server Running', version: '4.1.0' });
+  res.json({ status: 'OXOKE Server Running', version: '5.0.0' });
 });
 
 // ==============================
-// POST /api/get-trial
-// প্রতিটা PC তে একবার ১ দিনের free trial
+// PUBLIC: Extension & Trial Status
 // ==============================
-app.post('/api/get-trial', async (req, res) => {
-  const { pc_fingerprint } = req.body;
-  if (!pc_fingerprint) return res.status(400).json({ success: false, message: 'Missing pc_fingerprint' });
-
-  const hashedPc = hashId(pc_fingerprint);
-
-  // GitHub data না থাকলে load করার চেষ্টা করো
-  if (!_trialsMemory) {
-    if (GITHUB_TOKEN && GITHUB_REPO) {
-      console.log(`[get-trial] Loading trials from GitHub...`);
-      await loadTrialsFromGitHub().catch((e) => { console.log('[get-trial] GitHub load failed:', e.message); });
-    } else {
-      console.log(`[get-trial] No GitHub config — using local file`);
-    }
-  }
-
-  // Trial enabled check
-  // Config memory না থাকলে GitHub থেকে load করো
-  if (!_configMemory && GITHUB_TOKEN && GITHUB_REPO) {
-    await loadConfigFromGitHub().catch(() => {});
-  }
-  const cfgCheck = loadConfig();
-  if (!cfgCheck.extension_enabled) {
-    return res.status(403).json({ success: false, message: 'Extension under maintenance.', maintenance: true });
-  }
-  if (!cfgCheck.trial_enabled) {
-    return res.status(403).json({ success: false, message: 'Free trial is currently disabled.', trial_disabled: true });
-  }
-
-  const trials = loadTrials();
-  console.log(`[get-trial] PC: ${hashedPc.slice(0,8)}... | Total PCs in DB: ${Object.keys(trials.used_pcs||{}).length}`);
-  if (trials.used_pcs[hashedPc]) {
-    const prevTrial = trials.used_pcs[hashedPc];
-    const cfg = loadConfig();
-    // Trial এখনও active আছে?
-    if (new Date(prevTrial.expiry).getTime() > Date.now()) {
-      // Trial still running — return existing (even after reinstall)
-      return res.json({
-        success: true,
-        key: prevTrial.key,
-        expiry: prevTrial.expiry,
-        duration_ms: cfg.trial_duration_ms || (2 * 60 * 60 * 1000),
-        message: 'Trial reactivated.'
-      });
-    } else {
-      // Trial শেষ হয়ে গেছে — retry allowed?
-      const record = trials.used_pcs[hashedPc];
-      const retryCount = record.retry_count || 0;
-      // Unlimited retry ON — সবসময় দাও
-      const canRetryUnlimited = cfg.unlimited_retry === true;
-      // Limited retry — limit এর মধ্যে আছে
-      const canRetryLimited = (cfg.retry_limit > 0) && (retryCount < cfg.retry_limit);
-      // Manual retry (Give Retry Chance Again button)
-      const globalRetryTs = cfg.global_retry_ts || 0;
-      const lastTrialExpiry = record.expiry ? new Date(record.expiry).getTime() : 0;
-      const canRetryManual = record.manual_retry === true || (globalRetryTs > 0 && lastTrialExpiry < globalRetryTs);
-      const canRetry = canRetryUnlimited || canRetryLimited || canRetryManual;
-      if (canRetry) {
-        // Retry — fresh trial দাও
-        const trialDurationMs = cfg.trial_duration_ms || (2 * 60 * 60 * 1000);
-        const newExpiry = new Date(Date.now() + trialDurationMs).toISOString();
-        const newKey = generateTrialKey();
-        const newRetryCount = (record.retry_count || 0) + 1;
-        // retry consume করো
-        trials.used_pcs[hashedPc] = { key: newKey, expiry: newExpiry, created: new Date().toISOString(), retried: true, retry_used: true, manual_retry: false, retry_count: newRetryCount };
-        await saveTrials(trials);
-        return res.json({ success: true, key: newKey, expiry: newExpiry, type: 'trial', duration_ms: trialDurationMs, message: 'Trial restarted.' });
-      }
-      return res.status(403).json({
-        success: false,
-        message: 'Free trial already used on this PC. Purchase a license: +8801811507607'
-      });
-    }
-  }
-
-  // নতুন trial তৈরি করি
-  const trialKey = generateTrialKey();
+app.get('/api/status', async (req, res) => {
+  if (!_configMemory && GITHUB_TOKEN && GITHUB_REPO) await loadConfigFromGitHub().catch(()=>{});
   const cfg = loadConfig();
-  const trialDurationMs = cfg.trial_duration_ms || (2 * 60 * 60 * 1000);
-  const expiry = new Date(Date.now() + trialDurationMs).toISOString();
-
-  trials.used_pcs[hashedPc] = {
-    key: trialKey,
-    expiry: expiry,
-    created: new Date().toISOString()
-  };
-  await saveTrials(trials);
-
   return res.json({
-    success: true,
-    key: trialKey,
-    expiry: expiry,
-    type: 'trial',
-    duration_ms: trialDurationMs,
-    message: 'Trial activated! Enjoy 24 hours of ad-free browsing.'
+    extension_enabled: cfg.extension_enabled !== false,
+    trial_enabled:     cfg.trial_enabled     !== false
   });
 });
 
-// ==============================
-// PUBLIC: CHECK if PC already used trial
-// ==============================
-app.post('/api/check-trial-status', async (req, res) => {
-  const { pc_fingerprint } = req.body;
-  if (!pc_fingerprint) return res.json({ used: false });
-  
-  // Config memory না থাকলে GitHub থেকে load করো
-  if (!_configMemory && GITHUB_TOKEN && GITHUB_REPO) {
-    await loadConfigFromGitHub().catch(() => {});
-  }
-
-  // Extension/trial enabled check
-  const statusCfg = loadConfig();
-  if (!statusCfg.extension_enabled) {
-    return res.json({ maintenance: true, used: false });
-  }
-  if (!statusCfg.trial_enabled) {
-    return res.json({ trial_disabled: true, used: false });
-  }
-  
-  const hashedPc = hashId(pc_fingerprint);
-
-  // GitHub data না থাকলে load করো
-  if (!_trialsMemory) {
-    if (GITHUB_TOKEN && GITHUB_REPO) {
-      await loadTrialsFromGitHub().catch(() => {});
-      // Load করার পরেও না পেলে — safe fail: block করো
-      if (!_trialsMemory) {
-        return res.json({ used: true, retry_allowed: false, reason: 'data_loading' });
-      }
-    }
-  }
-
-  const trials = loadTrials();
-  const record = trials.used_pcs[hashedPc];
-  console.log(`[check-trial-status] PC: ${hashedPc.slice(0,8)}... | Found: ${!!record} | Total PCs: ${Object.keys(trials.used_pcs||{}).length}`);
-  if (!record) return res.json({ used: false });
-  // Record আছে মানেই এই PC trial নিয়েছে
-  const cfg = loadConfig();
-  const isExpired = record.expiry && Date.now() > new Date(record.expiry).getTime();
-  
-  // Trial এখনো active (expired না) → resume করতে দাও
-  if (!isExpired) {
-    return res.json({ used: true, active: true, expiry: record.expiry, retry_allowed: false });
-  }
-  
-  // Trial expired — retry check
-  // Retry Trial toggle ON + ১বার retry বাকি আছে
-  // Unlimited retry ON
-  const retryByUnlimited = cfg.unlimited_retry === true;
-  // Limited retry — limit এর মধ্যে আছে
-  const retryByLimit = (cfg.retry_limit > 0) && ((record.retry_count || 0) < cfg.retry_limit);
-  // Give Retry Chance Again বাটনে manually দেওয়া হয়েছে
-  const globalRetryTs = cfg.global_retry_ts || 0;
-  const lastTrialExpiry = record.expiry ? new Date(record.expiry).getTime() : 0;
-  const retryByManual = record.manual_retry === true || (globalRetryTs > 0 && lastTrialExpiry < globalRetryTs);
-  const retryAllowed = retryByUnlimited || retryByLimit || retryByManual;
-  return res.json({ used: true, active: false, expiry: record.expiry || null, retry_allowed: retryAllowed });
-});
-
-// ==============================
 app.get('/api/trial-duration', (req, res) => {
   const cfg = loadConfig();
   return res.json({ success: true, duration_ms: cfg.trial_duration_ms || (2 * 60 * 60 * 1000) });
 });
 
 // ==============================
-// ADMIN: GET trial config
+// POST /api/get-trial
 // ==============================
-app.post('/api/admin/trial-config', (req, res) => {
-  const { admin_key } = req.body;
-  if (admin_key !== ADMIN_KEY) return res.status(403).json({ success: false, message: 'Invalid admin key' });
+app.post('/api/get-trial', async (req, res) => {
+  const { pc_fingerprint } = req.body;
+  if (!pc_fingerprint) return res.status(400).json({ success: false, message: 'Missing pc_fingerprint' });
+
+  if (!_configMemory && GITHUB_TOKEN && GITHUB_REPO) await loadConfigFromGitHub().catch(()=>{});
   const cfg = loadConfig();
-  return res.json({ success: true, trial_duration_ms: cfg.trial_duration_ms || (2 * 60 * 60 * 1000) });
+
+  // Extension disabled?
+  if (!cfg.extension_enabled) {
+    return res.status(403).json({ success: false, message: 'Extension under maintenance.', maintenance: true });
+  }
+  // Trial globally disabled?
+  if (!cfg.trial_enabled) {
+    return res.status(403).json({ success: false, message: 'Free trial is currently disabled.', trial_disabled: true });
+  }
+
+  const hashedPc = hashId(pc_fingerprint);
+  if (!_trialsMemory && GITHUB_TOKEN && GITHUB_REPO) await loadTrialsFromGitHub().catch(()=>{});
+
+  const trials = loadTrials();
+  console.log(`[get-trial] PC: ${hashedPc.slice(0,8)}... | Total: ${Object.keys(trials.used_pcs||{}).length}`);
+
+  if (trials.used_pcs[hashedPc]) {
+    const prev = trials.used_pcs[hashedPc];
+    // Still active?
+    if (new Date(prev.expiry).getTime() > Date.now()) {
+      return res.json({ success: true, key: prev.key, expiry: prev.expiry, duration_ms: cfg.trial_duration_ms, message: 'Trial reactivated.' });
+    }
+    // Expired — retry?
+    const canRetry = cfg.unlimited_retry === true || cfg.allow_retry_trial === true;
+    if (canRetry) {
+      const trialDurationMs = cfg.trial_duration_ms || (2 * 60 * 60 * 1000);
+      const newExpiry = new Date(Date.now() + trialDurationMs).toISOString();
+      const newKey = generateTrialKey();
+      trials.used_pcs[hashedPc] = { key: newKey, expiry: newExpiry, created: new Date().toISOString(), retried: true };
+      await saveTrials(trials);
+      return res.json({ success: true, key: newKey, expiry: newExpiry, type: 'trial', duration_ms: trialDurationMs, message: 'Trial restarted.' });
+    }
+    return res.status(403).json({ success: false, message: 'Free trial already used. Purchase a license: +8801811507607' });
+  }
+
+  // New trial
+  const trialKey = generateTrialKey();
+  const trialDurationMs = cfg.trial_duration_ms || (2 * 60 * 60 * 1000);
+  const expiry = new Date(Date.now() + trialDurationMs).toISOString();
+  trials.used_pcs[hashedPc] = { key: trialKey, expiry, created: new Date().toISOString() };
+  await saveTrials(trials);
+  return res.json({ success: true, key: trialKey, expiry, type: 'trial', duration_ms: trialDurationMs, message: 'Trial activated!' });
 });
 
 // ==============================
-// ADMIN: SET trial duration
+// PUBLIC: Check trial status
 // ==============================
-app.post('/api/admin/set-trial-duration', async (req, res) => {
-  const { admin_key, duration_ms } = req.body;
-  if (admin_key !== ADMIN_KEY) return res.status(403).json({ success: false, message: 'Invalid admin key' });
-  if (!duration_ms || duration_ms < 60000) return res.status(400).json({ success: false, message: 'Minimum 60000ms (1 minute)' });
+app.post('/api/check-trial-status', async (req, res) => {
+  const { pc_fingerprint } = req.body;
+  if (!pc_fingerprint) return res.json({ used: false });
+
+  if (!_configMemory && GITHUB_TOKEN && GITHUB_REPO) await loadConfigFromGitHub().catch(()=>{});
   const cfg = loadConfig();
-  cfg.trial_duration_ms = duration_ms;
-  await saveConfigAsync(cfg);
-  return res.json({ success: true, message: 'Trial duration updated', trial_duration_ms: duration_ms });
+
+  if (!cfg.extension_enabled) return res.json({ maintenance: true, used: false });
+  if (!cfg.trial_enabled)     return res.json({ trial_disabled: true, used: false });
+
+  const hashedPc = hashId(pc_fingerprint);
+  if (!_trialsMemory && GITHUB_TOKEN && GITHUB_REPO) {
+    await loadTrialsFromGitHub().catch(()=>{});
+    if (!_trialsMemory) return res.json({ used: true, retry_allowed: false, reason: 'data_loading' });
+  }
+
+  const trials = loadTrials();
+  const record = trials.used_pcs[hashedPc];
+  if (!record) return res.json({ used: false });
+
+  const isExpired = record.expiry && Date.now() > new Date(record.expiry).getTime();
+  if (!isExpired) {
+    return res.json({ used: true, active: true, expiry: record.expiry, retry_allowed: false });
+  }
+  const retryAllowed = cfg.unlimited_retry === true || cfg.allow_retry_trial === true;
+  return res.json({ used: true, active: false, expiry: record.expiry || null, retry_allowed: retryAllowed });
 });
 
 // ==============================
-// ADMIN: GET retry trial status
-// ==============================
-app.post('/api/admin/get-retry-trial', (req, res) => {
-  const { admin_key } = req.body;
-  if (admin_key !== ADMIN_KEY) return res.status(403).json({ success: false, message: 'Invalid admin key' });
-  const cfg = loadConfig();
-  return res.json({ success: true, allow_retry_trial: cfg.allow_retry_trial || false });
-});
-
-// ==============================
-// ADMIN: SET retry trial on/off
-// ==============================
+// ACTIVATE / VERIFY
 // ==============================
 app.post('/api/activate', (req, res) => {
   const { code, pc_fingerprint } = req.body;
   if (!code || !pc_fingerprint) return res.status(400).json({ success: false, message: 'Missing fields' });
-
   const nc = code.toUpperCase().trim();
   const hashedPc = hashId(pc_fingerprint);
   const data = loadData();
   const cd = data.activation_codes[nc];
-
   if (!cd) return res.status(404).json({ success: false, message: 'Invalid key. Contact: +8801811507607' });
-  if (!cd.active) return res.status(403).json({ success: false, message: 'This key is disabled. Contact: +8801811507607' });
-
-  // মেয়াদ শেষ হয়েছে?
-  if (cd.expiry && new Date(cd.expiry).getTime() < Date.now()) {
-    return res.status(403).json({ success: false, message: 'This key has expired. Purchase a new one: +8801811507607' });
-  }
-
+  if (!cd.active) return res.status(403).json({ success: false, message: 'Key disabled. Contact: +8801811507607' });
+  if (cd.expiry && new Date(cd.expiry).getTime() < Date.now()) return res.status(403).json({ success: false, message: 'Key expired. Contact: +8801811507607' });
   if (!cd.locked_pc) {
-    // প্রথমবার activate — এই PC এ lock করি
     cd.locked_pc = hashedPc;
     cd.activated_at = new Date().toISOString();
-    // Expiry set — আজ থেকে ৩০ দিন
     if (!cd.expiry) {
-      // expiry_ms দিয়ে exact মেয়াদ set করি (minutes/hours/days সব support)
       const ms = cd.expiry_ms || ((cd.expiry_days || 30) * 24 * 60 * 60 * 1000);
       cd.expiry = new Date(Date.now() + ms).toISOString();
     }
     saveData(data);
-    return res.json({
-      success: true,
-      type: 'monthly',
-      expiry: cd.expiry,
-      message: 'Activation successful! Valid for 30 days.'
-    });
+    return res.json({ success: true, type: 'monthly', expiry: cd.expiry, message: 'Activation successful!' });
   }
-
-  // এই PC এ আগে activate হয়েছিল?
-  if (cd.locked_pc === hashedPc) {
-    return res.json({
-      success: true,
-      type: 'monthly',
-      expiry: cd.expiry,
-      message: 'License verified for this PC.'
-    });
-  }
-
-  // ভিন্ন PC — block
-  return res.status(403).json({
-    success: false,
-    message: 'This key is already activated on another PC. Contact: +8801811507607'
-  });
+  if (cd.locked_pc === hashedPc) return res.json({ success: true, type: 'monthly', expiry: cd.expiry, message: 'License verified.' });
+  return res.status(403).json({ success: false, message: 'Key already activated on another PC. Contact: +8801811507607' });
 });
 
-// ==============================
-// POST /api/verify
-// ==============================
 app.post('/api/verify', (req, res) => {
   const { code, pc_fingerprint } = req.body;
   if (!code || !pc_fingerprint) return res.json({ valid: false });
-
   const nc = code.toUpperCase().trim();
-
-  // Trial key check
   if (nc.startsWith('TRIAL-')) {
     const hashedPc = hashId(pc_fingerprint);
     const trials = loadTrials();
@@ -488,25 +319,19 @@ app.post('/api/verify', (req, res) => {
     const valid = new Date(entry.expiry).getTime() > Date.now();
     return res.json({ valid, expiry: entry.expiry, type: 'trial' });
   }
-
-  // Monthly key check
   const hashedPc = hashId(pc_fingerprint);
   const data = loadData();
   const cd = data.activation_codes[nc];
-  if (!cd || !cd.active) return res.json({ valid: false });
-  if (cd.locked_pc !== hashedPc) return res.json({ valid: false });
+  if (!cd || !cd.active || cd.locked_pc !== hashedPc) return res.json({ valid: false });
   const valid = !cd.expiry || new Date(cd.expiry).getTime() > Date.now();
   return res.json({ valid, expiry: cd.expiry, type: 'monthly' });
 });
 
 // ==============================
-// ADMIN ROUTES
+// ADMIN HELPERS
 // ==============================
 function checkAdmin(req, res) {
-  if (req.headers['x-admin-key'] !== ADMIN_KEY) {
-    res.status(403).json({ error: 'Unauthorized' });
-    return false;
-  }
+  if (req.headers['x-admin-key'] !== ADMIN_KEY) { res.status(403).json({ error: 'Unauthorized' }); return false; }
   return true;
 }
 
@@ -516,14 +341,7 @@ app.get('/admin/codes', (req, res) => {
   const out = {};
   for (const [code, info] of Object.entries(data.activation_codes)) {
     const expired = info.expiry && new Date(info.expiry).getTime() < Date.now();
-    out[code] = {
-      active: info.active,
-      locked_pc: info.locked_pc ? '✓ Locked' : '○ Free',
-      expiry: info.expiry || 'Not activated',
-      expired: !!expired,
-      created: info.created,
-      activated_at: info.activated_at || null
-    };
+    out[code] = { active: info.active, locked_pc: info.locked_pc ? '✓ Locked' : '○ Free', expiry: info.expiry || 'Not activated', expired: !!expired, created: info.created, activated_at: info.activated_at || null };
   }
   res.json({ total: Object.keys(out).length, codes: out });
 });
@@ -543,15 +361,8 @@ app.post('/admin/add-code', (req, res) => {
   const data = loadData();
   const nc = code.toUpperCase().trim();
   if (data.activation_codes[nc]) return res.status(409).json({ error: 'Already exists' });
-  // expiry_ms (minutes/hours support) > expiry_days > default 30 days
   const ms = expiry_ms || (expiry_days || custom_expiry_days || 30) * 24 * 60 * 60 * 1000;
-  data.activation_codes[nc] = {
-    active: true, locked_pc: null, expiry: null,
-    expiry_ms: ms,
-    expiry_label: expiry_label || (Math.round(ms/86400000) + ' days'),
-    key_type: key_type || 'monthly',
-    created: new Date().toISOString().split('T')[0]
-  };
+  data.activation_codes[nc] = { active: true, locked_pc: null, expiry: null, expiry_ms: ms, expiry_label: expiry_label || (Math.round(ms/86400000) + ' days'), key_type: key_type || 'monthly', created: new Date().toISOString().split('T')[0] };
   saveData(data);
   res.json({ success: true, code: nc, expiry_label: expiry_label });
 });
@@ -571,58 +382,97 @@ app.post('/admin/reset-code', (req, res) => {
   const data = loadData();
   const nc = req.body.code.toUpperCase().trim();
   if (!data.activation_codes[nc]) return res.status(404).json({ error: 'Not found' });
-  // PC lock ও expiry reset করি — নতুন PC তে activate করা যাবে
   data.activation_codes[nc].locked_pc = null;
   data.activation_codes[nc].expiry = null;
   data.activation_codes[nc].activated_at = null;
   saveData(data);
-  res.json({ success: true, message: `Code ${nc} reset. Can be activated on a new PC.` });
+  res.json({ success: true, message: `Code ${nc} reset.` });
 });
 
-
 // ==============================
-// ADMIN: Get full config
+// ADMIN: GET full config
 // ==============================
 app.post('/api/admin/get-config', async (req, res) => {
   const { admin_key } = req.body;
   if (admin_key !== ADMIN_KEY) return res.status(403).json({ success: false });
-  if (!_configMemory) await loadConfigFromGitHub().catch(()=>{});
+  if (!_configMemory && GITHUB_TOKEN && GITHUB_REPO) await loadConfigFromGitHub().catch(()=>{});
   const cfg = loadConfig();
   return res.json({ success: true, config: cfg });
 });
 
 // ==============================
-// ADMIN: Set trial enabled
+// ADMIN: Set trial duration
+// ==============================
+app.post('/api/admin/set-trial-duration', async (req, res) => {
+  const { admin_key, duration_ms } = req.body;
+  if (admin_key !== ADMIN_KEY) return res.status(403).json({ success: false });
+  if (!duration_ms || duration_ms < 60000) return res.status(400).json({ success: false, message: 'Minimum 60000ms' });
+  if (!_configMemory && GITHUB_TOKEN && GITHUB_REPO) await loadConfigFromGitHub().catch(()=>{});
+  const cfg = loadConfig();
+  cfg.trial_duration_ms = duration_ms;
+  saveConfig(cfg);
+  await saveConfigToGitHub(cfg).catch(()=>{});
+  return res.json({ success: true, trial_duration_ms: duration_ms });
+});
+
+// ==============================
+// ADMIN: Set trial enabled ON/OFF
 // ==============================
 app.post('/api/admin/set-trial-enabled', async (req, res) => {
   const { admin_key, trial_enabled } = req.body;
   if (admin_key !== ADMIN_KEY) return res.status(403).json({ success: false });
+  if (!_configMemory && GITHUB_TOKEN && GITHUB_REPO) await loadConfigFromGitHub().catch(()=>{});
   const cfg = loadConfig();
   cfg.trial_enabled = !!trial_enabled;
-  await saveConfigAsync(cfg);
+  saveConfig(cfg);
+  await saveConfigToGitHub(cfg).catch(()=>{});
+  console.log(`[Admin] Trial enabled: ${cfg.trial_enabled}`);
   return res.json({ success: true, trial_enabled: cfg.trial_enabled });
 });
 
 // ==============================
-// ADMIN: Set extension enabled
+// ADMIN: Set extension enabled ON/OFF (maintenance)
 // ==============================
 app.post('/api/admin/set-extension-enabled', async (req, res) => {
   const { admin_key, extension_enabled } = req.body;
   if (admin_key !== ADMIN_KEY) return res.status(403).json({ success: false });
+  if (!_configMemory && GITHUB_TOKEN && GITHUB_REPO) await loadConfigFromGitHub().catch(()=>{});
   const cfg = loadConfig();
   cfg.extension_enabled = !!extension_enabled;
-  await saveConfigAsync(cfg);
+  saveConfig(cfg);
+  await saveConfigToGitHub(cfg).catch(()=>{});
+  console.log(`[Admin] Extension enabled: ${cfg.extension_enabled}`);
   return res.json({ success: true, extension_enabled: cfg.extension_enabled });
 });
 
+// ==============================
+// ADMIN: Set unlimited retry
+// ==============================
+app.post('/api/admin/set-unlimited-retry', async (req, res) => {
+  const { admin_key, enabled } = req.body;
+  if (admin_key !== ADMIN_KEY) return res.status(403).json({ success: false });
+  if (!_configMemory && GITHUB_TOKEN && GITHUB_REPO) await loadConfigFromGitHub().catch(()=>{});
+  const cfg = loadConfig();
+  cfg.unlimited_retry = !!enabled;
+  saveConfig(cfg);
+  await saveConfigToGitHub(cfg).catch(()=>{});
+  return res.json({ success: true, unlimited_retry: cfg.unlimited_retry });
+});
 
 // ==============================
-// ADMIN: Reset retry_used for all PCs
-// (তাদের আবার ১বার retry সুযোগ দাও)
+// ADMIN: Reset ALL trials
 // ==============================
+app.post('/api/admin/reset-trials', async (req, res) => {
+  const { admin_key } = req.body;
+  if (admin_key !== ADMIN_KEY) return res.status(403).json({ success: false });
+  const fresh = { used_pcs: {} };
+  await saveTrials(fresh);
+  console.log('[Admin] All trials reset');
+  return res.json({ success: true, message: 'All trial history cleared.' });
+});
 
 // ==============================
-// ADMIN: Reset Trial History for Expired PCs only
+// ADMIN: Reset EXPIRED trials only
 // ==============================
 app.post('/api/admin/reset-expired-trials', async (req, res) => {
   const { admin_key } = req.body;
@@ -631,74 +481,28 @@ app.post('/api/admin/reset-expired-trials', async (req, res) => {
   const trials = loadTrials();
   let count = 0;
   Object.keys(trials.used_pcs || {}).forEach(pc => {
-    const record = trials.used_pcs[pc];
-    const isExpired = record.expiry && Date.now() > new Date(record.expiry).getTime();
-    if (isExpired) {
+    const r = trials.used_pcs[pc];
+    if (r.expiry && Date.now() > new Date(r.expiry).getTime()) {
       delete trials.used_pcs[pc];
       count++;
     }
   });
   if (count > 0) await saveTrials(trials);
-  console.log(`[Admin] Reset expired trials: ${count} PCs removed`);
+  console.log(`[Admin] Expired trials reset: ${count} PCs`);
   return res.json({ success: true, reset_count: count, message: `${count} টি expired PC এর trial history মুছে ফেলা হয়েছে।` });
 });
 
 // ==============================
-// ADMIN: Set Unlimited Retry (ON/OFF)
+// STARTUP
 // ==============================
-app.post('/api/admin/set-unlimited-retry', async (req, res) => {
-  const { admin_key, enabled } = req.body;
-  if (admin_key !== ADMIN_KEY) return res.status(403).json({ success: false });
-  if (!_configMemory && GITHUB_TOKEN && GITHUB_REPO) await loadConfigFromGitHub().catch(()=>{});
-  const cfg = loadConfig();
-  cfg.unlimited_retry = !!enabled;
-  if (enabled) cfg.retry_limit = 0;
-  await saveConfigAsync(cfg);
-  console.log(`[Admin] Unlimited Retry: ${enabled ? 'ON' : 'OFF'}`);
-  return res.json({ success: true, unlimited_retry: _configMemory.unlimited_retry });
-});
-
-// ==============================
-// ADMIN: Set Retry Limit (কতবার)
-// ==============================
-
-// ==============================
-// ADMIN: Reset all trials
-// ==============================
-app.post('/api/admin/reset-trials', async (req, res) => {
-  const { admin_key } = req.body;
-  if (admin_key !== ADMIN_KEY) return res.status(403).json({ success: false });
-  const fresh = { used_pcs: {} };
-  saveTrials(fresh);
-  return res.json({ success: true, message: 'All trial history cleared.' });
-});
-
-// ==============================
-// PUBLIC: Get extension status
-// ==============================
-app.get('/api/status', async (req, res) => {
-  // Config memory না থাকলে GitHub থেকে load করো
-  if (!_configMemory && GITHUB_TOKEN && GITHUB_REPO) {
-    await loadConfigFromGitHub().catch(()=>{});
-  }
-  const cfg = loadConfig();
-  return res.json({
-    extension_enabled: cfg.extension_enabled !== false,
-    trial_enabled: cfg.trial_enabled !== false
-  });
-});
-
-// Startup: load trials from GitHub first, then start server
 Promise.all([
   loadTrialsFromGitHub().catch(()=>{}),
   loadConfigFromGitHub().catch(()=>{})
 ]).finally(() => {
   console.log(`[startup] GitHub configured: ${!!(GITHUB_TOKEN && GITHUB_REPO)}`);
+  console.log(`[startup] Config in memory: ${JSON.stringify(_configMemory)}`);
   console.log(`[startup] Trials in memory: ${Object.keys((_trialsMemory||{}).used_pcs||{}).length} PCs`);
   app.listen(PORT, () => {
-    console.log(`\n🚀 OXOKE Server v4.1 running on port ${PORT}`);
-    console.log(`✅ Trial system: ENABLED`);
-    console.log(`✅ Monthly keys: ENABLED`);
-    console.log(`✅ PC-locked activation: ENABLED`);
-});
+    console.log(`\n🚀 OXOKE Server v5.0 running on port ${PORT}`);
+  });
 });
