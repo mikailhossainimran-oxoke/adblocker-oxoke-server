@@ -2,7 +2,7 @@
   "trial_duration_ms": 1800000,
   "trial_enabled": true,
   "extension_enabled": true,
-  "expired_trial_enabled": true,
+  "expired_trial_enabled": false,
   "unlimited_retry": true,
   "allow_retry_trial": false
 }
