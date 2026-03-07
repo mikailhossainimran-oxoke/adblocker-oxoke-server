@@ -227,7 +227,7 @@ app.post('/api/get-trial', async (req, res) => {
       // Trial এখনো active — resume
       return res.json({ success: true, key: prev.key, expiry: prev.expiry, duration_ms: cfg.trial_duration_ms, message: 'Trial reactivated.' });
     }
-    // Trial expired — blocked (retry নেই)
+    // Trial expired — সবসময় block, Reset Expired না করলে আর পাবে না
     return res.status(403).json({ success: false, message: 'Free trial already used. Purchase a license: +8801811507607' });
   }
 
