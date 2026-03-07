@@ -1,3 +1,9 @@
 {
-  "used_pcs": {}
+  "used_pcs": {
+    "24e8ec46e95628bd": {
+      "key": "TRIAL-9XTSU-TANZ3",
+      "expiry": "2026-04-06T06:42:42.241Z",
+      "created": "2026-03-07T06:42:42.241Z"
+    }
+  }
 }
